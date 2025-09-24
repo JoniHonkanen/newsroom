@@ -1,0 +1,20 @@
+feeds:
+  #- name: "Yle Uutiset"
+  #  extra_info: "tuoreimmat"
+  #  feed_type: "rss"
+  #  category: "news"
+  #  origin: "media"
+  #  url: "https://yle.fi/rss/uutiset/tuoreimmat"
+  #  active: true
+  #  added_at: "2024-06-11T14:00:00"
+  #  modified_at: "2024-06-11T14:00:00"
+
+  - name: "Epressi"
+    extra_info: "Kotimaan uutiset"
+    feed_type: "rss"
+    category: "press_release"
+    origin: "authority"
+    url: "https://www.epressi.com/tiedotteet/sarjakuva-ja-kuvitus.rss"
+    active: true
+    added_at: "2024-06-11T14:10:00"
+    modified_at: "2024-06-11T14:10:00"
