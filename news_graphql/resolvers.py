@@ -4,9 +4,9 @@ from strawberry import ID
 import logging
 from typing import List, Optional
 
-from schema import CategoryStats, NewsArticle, NewsOrderBy, SimilarNewsArticle
-from database import get_db_pool
-from utils import build_order_clause, map_db_row_to_news_article
+from utils.database import get_db_pool
+from .schema import CategoryStats, NewsArticle, NewsOrderBy, SimilarNewsArticle
+from .utils import build_order_clause, map_db_row_to_news_article
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ import psycopg
 from pydantic import BaseModel
 from typing import List
 
-from ...utils.database import get_db_connection
+from utils.database import get_db_connection
 
 router = APIRouter()
 

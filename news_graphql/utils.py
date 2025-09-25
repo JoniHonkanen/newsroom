@@ -5,7 +5,7 @@ import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from schema import (
+from .schema import (
     NewsArticle,
     Location,
     LocationTags,

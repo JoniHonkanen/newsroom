@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 import psycopg
 from pydantic import BaseModel
 
-from ...utils.database import get_db_connection
+from utils.database import get_db_connection
 
 router = APIRouter()
 

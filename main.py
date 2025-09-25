@@ -25,6 +25,8 @@ import yaml
 import time
 import os
 
+# THIS IS THE AGENT SYSTEM THAT GENERATES, REVIEWS, EDITS, INTERVIEWS AND PUBLISHES NEWS ARTICLES
+
 # Load environment variables from .env file
 load_dotenv()
 # This is what we use to connect to the PostgreSQL database

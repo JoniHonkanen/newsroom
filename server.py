@@ -1,6 +1,13 @@
 # server.py
 import os
+import sys
 import logging
+
+# thi server is ment for BUSINESS LOGIC, not for GraphQL (newsroom frontend)
+
+# Lisää root-polku heti alussa
+#sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -76,5 +83,5 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("BUSINESS_LOGIC_SERVER", 8000))
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)
