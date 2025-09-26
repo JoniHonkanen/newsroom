@@ -37,6 +37,24 @@ CREATE TABLE keyword_translation (
 );
 
 -- FOR INTERVIEWS, WE COLLECT THESE INFORMATIONS FROM RSS
+-- NOTE: moved after canonical_news so FK resolves during init
+
+-- MAIN NEWS TABLE
+CREATE TABLE canonical_news (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT,
+    source_name TEXT,
+    source_url TEXT,
+    content_hash TEXT UNIQUE,
+    content_embedding VECTOR(384),
+    published_at TIMESTAMP WITH TIME ZONE, -- When the article was published
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(), -- When the article was created in the system
+    language TEXT,
+    article_type TEXT
+);
+
+-- Now create news_contacts after canonical_news exists
 CREATE TABLE news_contacts (
     id SERIAL PRIMARY KEY,
     canonical_news_id INTEGER REFERENCES canonical_news(id) ON DELETE CASCADE,
@@ -54,21 +72,6 @@ CREATE TABLE news_contacts (
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
--- MAIN NEWS TABLE
-CREATE TABLE canonical_news (
-    id SERIAL PRIMARY KEY,
-    title TEXT NOT NULL,
-    content TEXT,
-    source_name TEXT,
-    source_url TEXT,
-    content_hash TEXT UNIQUE,
-    content_embedding VECTOR(384),
-    published_at TIMESTAMP WITH TIME ZONE, -- When the article was published
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(), -- When the article was created in the system
-    language TEXT,
-    article_type TEXT
 );
 
 -- REFERENCES to canonical_news table
@@ -109,8 +112,8 @@ CREATE TABLE news_article (
     interview_decision BOOLEAN DEFAULT FALSE,  -- Whether this article has been interviewed
     required_corrections BOOLEAN DEFAULT FALSE,  -- Whether this article required corrections after review
     revision_count INTEGER DEFAULT 0,  -- Number of times this article has been revised
-    categories TEXT[]
-    hero_image_url TEXT, -- URL for main image
+    categories TEXT[],
+    hero_image_url TEXT -- URL for main image
 );
 
 -- EDITOR IN CHIEF NEED TO DECIDE DO WE NEED INTERVIEW... and is it via phone or email
@@ -162,7 +165,7 @@ CREATE TABLE email_interview (
     recipient TEXT,
     subject TEXT,
     sent_at TIMESTAMP,
-    status TEXT
+    status TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
@@ -194,7 +197,7 @@ CREATE TABLE phone_interview (
     transcript_json JSONB, -- THIS IS THE ANSWERS FROM DONE INTERVIEW
     status TEXT, -- WHEN INTERVIEW DONE -- THIS SHOULD BE DONE
     created_at TIMESTAMP DEFAULT now(),
-    phone_script_json JSONB, -- THIS IS THE INTERVIEW WE ARE GOING TO DO
+    phone_script_json JSONB -- THIS IS THE INTERVIEW WE ARE GOING TO DO
 );
 
 CREATE TABLE phone_interview_attempt (
