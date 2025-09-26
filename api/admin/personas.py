@@ -15,7 +15,7 @@ class EthicalPersona(BaseModel):
 
 # ETHICAL PERSONAS ROUTES
 # GET ALL PERSONAS
-@router.get("/api/ethical-personas")
+@router.get("/ethical-personas")
 async def get_ethical_personas():
     """Hae kaikki eettiset persoonat"""
     async with await get_db_connection() as conn:
@@ -41,7 +41,7 @@ async def get_ethical_personas():
 
 
 # CREATE NEW PERSONA
-@router.post("/api/ethical-personas")
+@router.post("/ethical-personas")
 async def create_ethical_persona(persona: EthicalPersona):
     """Luo uusi eettinen persoona"""
     async with await get_db_connection() as conn:
@@ -70,7 +70,7 @@ async def create_ethical_persona(persona: EthicalPersona):
 
 
 # DELETE PERSONA
-@router.delete("/api/ethical-personas/{persona_id}")
+@router.delete("/ethical-personas/{persona_id}")
 async def delete_ethical_persona(persona_id: int):
     """Poista eettinen persoona (vain käyttäjän luomat)"""
     async with await get_db_connection() as conn:

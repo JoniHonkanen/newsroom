@@ -252,7 +252,7 @@ async def handle_media_stream(websocket: WebSocket):
             },
         )
         logger.info("Successfully connected to OpenAI")
-        await initialize_session(openai_ws, None)
+    # Initialize session after Twilio 'start' event so we can include phone_script if available
 
         async def receive_from_twilio():
             nonlocal stream_sid, latest_media_timestamp, call_ended, last_assistant_item, response_start_timestamp_twilio
@@ -301,8 +301,10 @@ async def handle_media_stream(websocket: WebSocket):
                                     logger.info(
                                         f"Stored phone_script for stream {stream_sid}"
                                     )
-                                    # Re-initialize session with the correct script
-                                    await initialize_session(openai_ws, phone_script)
+                            # Initialize session now with stream-specific script (or defaults)
+                            await initialize_session(
+                                openai_ws, stream_phone_scripts.get(stream_sid)
+                            )
                         else:
                             logger.warning(
                                 "start event missing callSid – cannot link stream to call"
@@ -651,10 +653,9 @@ async def initialize_session(openai_ws, phone_script=None):
     # Use phone_script if provided, otherwise use defaults
     if phone_script:
         logger.info("🎯 USING PHONE_SCRIPT CONFIGURATION!")
-        instructions = phone_script.get("instructions")
-        print("TÄSSÄ ON OHJEET, näkyykö kysymykset?:")
-        print(instructions)
-        
+        base_instructions = (phone_script.get("instructions") or "").strip()
+        questions = phone_script.get("questions_data") or []
+        closing_q = phone_script.get("closing_question")
         requested_voice = phone_script.get("voice", VOICE)
 
         supported_voices = [
@@ -667,10 +668,10 @@ async def initialize_session(openai_ws, phone_script=None):
             "shimmer",
             "verse",
         ]
-        if requested_voice in supported_voices:
-            voice = requested_voice
-        else:
-            voice = "coral" if phone_script.get("language") == "fi" else "alloy"
+        voice = requested_voice if requested_voice in supported_voices else (
+            "coral" if phone_script.get("language") == "fi" else "alloy"
+        )
+        if voice != requested_voice:
             logger.warning(
                 f"Voice '{requested_voice}' not supported, using '{voice}' instead"
             )
@@ -678,11 +679,20 @@ async def initialize_session(openai_ws, phone_script=None):
         temperature = phone_script.get("temperature", 0.8)
         language = phone_script.get("language", "fi")
 
-        # Käytä vain alkuperäiset instructions sellaisenaan
-        instructions = (
-            instructions
-            + "\n\nTÄRKEÄ: Kun olet kysynyt kaikki kysymykset ja kiittänyt haastattelusta, sano selkeästi 'HAASTATTELU PÄÄTTYI KIITOS' ja lopeta puhuminen."
-        )
+        # Order questions by 'position' with a stable fallback to their input order
+        ordered = sorted(list(enumerate(questions, start=1)), key=lambda x: x[1].get("position", x[0]))
+        q_lines = [f"{idx}. {q.get('text')}" for idx, q in ordered if q.get("text")]
+        if closing_q:
+            q_lines.append(f"{len(q_lines)+1}. {closing_q}")
+
+        # Build strict instructions enforcing exact questions in exact order
+        instructions = "\n".join(filter(None, [
+            base_instructions,
+            "Kysy täsmälleen seuraavat kysymykset tässä järjestyksessä. Älä keksi uusia kysymyksiä. Odota vastaus joka kysymyksen jälkeen. Älä vastaa koskaan itse. Puhu vain suomea.",
+            "Kysymykset:",
+            *q_lines,
+            "Kun kaikki on kysytty ja vastaus saatu, kiitä haastattelusta ja sano: 'HAASTATTELU PÄÄTTYI KIITOS'.",
+        ]))
 
     else:
         logger.info("🔄 Using default configuration")
@@ -721,7 +731,8 @@ async def initialize_session(openai_ws, phone_script=None):
     try:
         logger.info("📤 Sending session update...")
         logger.info(f"Voice: {voice}, Temperature: {temperature}")
-        logger.info(f"Instructions: {instructions[:100]}...")
+        preview = "\n".join(instructions.splitlines()[:12])
+        logger.info(f"Instructions preview:\n{preview}")
 
         await openai_ws.send(json.dumps(session_update))
         logger.info("✅ Session update sent successfully")
@@ -846,8 +857,12 @@ async def update_interview_by_article_id(article_id, dialogue_turns):
             logger.info(
                 f"📊 Updated interview ID {interview_id} for article {article_id} with transcript ({len(dialogue_turns)} turns)"
             )
-            process_call_ended(article_id, dialogue_turns)  # Fire-and-forget
-            logger.info("📤 Webhook queued (fire-and-forget)")
+            # Fire-and-forget enrichment in background
+            try:
+                asyncio.create_task(process_call_ended(article_id, dialogue_turns))
+                logger.info("📤 Webhook queued (fire-and-forget)")
+            except Exception as e:
+                logger.warning(f"Failed to schedule enrichment task: {e}")
         else:
             logger.warning(
                 f"⚠️ No initiated phone_interview found for article: {article_id}"

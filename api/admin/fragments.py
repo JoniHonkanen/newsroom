@@ -16,9 +16,10 @@ class PromptFragment(BaseModel):
 
 # PROMPT FRAGMENTS ROUTES
 # GET ALL FRAGMENTS FOR CREATING PROMPTS
-@router.get("/api/prompt-fragments")
+@router.get("/prompt-fragments")
 async def get_prompt_fragments():
     """Hae kaikki prompt-fragmentit"""
+    print("ASDASDASD")
     async with await get_db_connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
@@ -29,6 +30,7 @@ async def get_prompt_fragments():
             """
             )
             rows = await cur.fetchall()
+            print(rows)
 
             return [
                 {
@@ -43,7 +45,7 @@ async def get_prompt_fragments():
 
 
 # CREATE NEW FRAGMENT
-@router.post("/api/prompt-fragments")
+@router.post("/prompt-fragments")
 async def create_prompt_fragment(fragment: PromptFragment):
     """Luo uusi prompt-fragmentti"""
     async with await get_db_connection() as conn:
@@ -72,7 +74,7 @@ async def create_prompt_fragment(fragment: PromptFragment):
 
 
 # DELETE FRAGMENT
-@router.delete("/api/prompt-fragments/{fragment_id}")
+@router.delete("/prompt-fragments/{fragment_id}")
 async def delete_prompt_fragment(fragment_id: int):
     """Poista prompt-fragmentti (vain käyttäjän luomat)"""
     async with await get_db_connection() as conn:
