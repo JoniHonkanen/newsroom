@@ -209,25 +209,58 @@ def enrich_article_with_phone_call(
 
 
 def _get_contact_info_by_article_id(article_id: int) -> Optional[Dict[str, Any]]:
-    """Hae yhteystiedot article_id:n perusteella news_contacts taulusta."""
+    """Hae yhteystiedot: id -> canonical_news_id -> news_contacts.canonical_news_id."""
     db_dsn = os.getenv("DATABASE_URL")
 
     try:
         with psycopg.connect(db_dsn) as conn:
             with conn.cursor() as cur:
-                # Hae ensisijainen yhteystieto tälle artikkelille
+                # 1) Hae artikkelin canonical_news_id id:llä
+                cur.execute(
+                    "SELECT canonical_news_id FROM news_article WHERE id = %s LIMIT 1",
+                    (article_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    logger.info(f"Artikkelia ei löytynyt id:llä: {article_id}")
+                    return None
+                canonical_id = row[0]
+                if canonical_id is None:
+                    logger.info(
+                        f"Artikkelilta puuttuu canonical_news_id (id={article_id})"
+                    )
+                    return None
+
+                # 2) Hae PRIMARY-yhteystieto canonical_news_id:llä
                 cur.execute(
                     """
                     SELECT name, title, organization
                     FROM news_contacts
-                    WHERE news_article_id = %s
+                    WHERE canonical_news_id = %s AND is_primary_contact = TRUE
                     ORDER BY id LIMIT 1
                     """,
-                    (article_id,),
+                    (canonical_id,),
                 )
-
                 row = cur.fetchone()
+                # 3) Fallback: jos primarya ei löydy, ota ensimmäinen mikä tahansa
                 if not row:
+                    logger.info(
+                        f"Primary contact ei löytynyt, haetaan ensimmäinen contact canonical_news_id:lle: {canonical_id}"
+                    )
+                    cur.execute(
+                        """
+                        SELECT name, title, organization
+                        FROM news_contacts
+                        WHERE canonical_news_id = %s
+                        ORDER BY id LIMIT 1
+                        """,
+                        (canonical_id,),
+                    )
+                    row = cur.fetchone()
+                if not row:
+                    logger.info(
+                        f"Yhteystietoja ei löytynyt canonical_news_id:lle: {canonical_id}"
+                    )
                     return None
 
                 name, title, organization = row

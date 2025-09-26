@@ -322,4 +322,4 @@ if __name__ == "__main__":
         state = AgentState()
         result = graph.invoke(state)
         print("Graph done!")
-        time.sleep(60)
+        time.sleep(120)

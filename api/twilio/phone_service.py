@@ -329,11 +329,8 @@ async def handle_media_stream(websocket: WebSocket):
                         except Exception as e:
                             logger.error(f"Error ending call via Twilio API: {e}")
                         finally:
-                            cs = stream_to_call.pop(stream_sid, None)
-                            if cs:
-                                call_to_article.pop(cs, None)
-                            stream_to_article.pop(stream_sid, None)
-                            stream_phone_scripts.pop(stream_sid, None)
+                            # Defer cleanup to outer finally after logs are saved
+                            pass
                         break
                     elif data["event"] == "mark" and mark_queue:
                         mark_queue.pop(0)
@@ -357,11 +354,8 @@ async def handle_media_stream(websocket: WebSocket):
                             f"Error ending call via Twilio API on disconnect: {e}"
                         )
                     finally:
-                        cs = stream_to_call.pop(stream_sid, None)
-                        if cs:
-                            call_to_article.pop(cs, None)
-                        stream_to_article.pop(stream_sid, None)
-                        stream_phone_scripts.pop(stream_sid, None)
+                        # Defer cleanup to outer finally after logs are saved
+                        pass
             except Exception as e:
                 logger.error(f"Error in receive_from_twilio: {e}")
                 call_ended = True
@@ -636,8 +630,22 @@ async def handle_media_stream(websocket: WebSocket):
             logger.info("Twilio WebSocket closed")
         except Exception as e:
             logger.error(f"Error closing Twilio WebSocket: {e}")
+        # Capture article_id before cleanup so saving can update DB
+        captured_article_id = None
         if stream_sid:
-            await save_conversation_log(stream_sid)
+            captured_article_id = stream_to_article.get(stream_sid)
+            await save_conversation_log(stream_sid, article_id=captured_article_id)
+
+        # Cleanup mappings after saving logs
+        try:
+            if stream_sid:
+                cs = stream_to_call.pop(stream_sid, None)
+                if cs:
+                    call_to_article.pop(cs, None)
+                stream_to_article.pop(stream_sid, None)
+                stream_phone_scripts.pop(stream_sid, None)
+        except Exception as e:
+            logger.warning(f"Cleanup mapping error: {e}")
         logger.info("Media stream handler completed")
 
 
@@ -742,7 +750,7 @@ async def initialize_session(openai_ws, phone_script=None):
         raise
 
 
-async def save_conversation_log(stream_sid):
+async def save_conversation_log(stream_sid, article_id=None):
     """Save conversation log to files and UPDATE database using article_id."""
     try:
         if stream_sid not in conversation_logs or not conversation_logs[stream_sid]:
@@ -774,8 +782,9 @@ async def save_conversation_log(stream_sid):
         with open(turns_filepath, "w", encoding="utf-8") as f:
             json.dump(dialogue_turns, f, ensure_ascii=False, indent=2)
 
-        # Update database using article_id from stream-specific mapping
-        article_id = stream_to_article.pop(stream_sid, None)
+        # Use provided article_id or fall back to current mapping without popping
+        if article_id is None:
+            article_id = stream_to_article.get(stream_sid)
 
         if article_id is not None:
             interview_id = await update_interview_by_article_id(
