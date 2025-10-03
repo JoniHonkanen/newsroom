@@ -72,7 +72,7 @@ class PhoneInterviewIntegration:
                 )  # EnrichedArticleWithInterview
 
                 # Use enriched content as-is - LLM should handle title formatting properly
-                final_markdown = enrichment_result.enriched_content.strip()
+                final_markdown = f"# {enrichment_result.enriched_title}\n\n{enrichment_result.enriched_content.strip()}"
 
                 # Update existing news_article using service
                 updated = self.article_service.update_article_after_interview(

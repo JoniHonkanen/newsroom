@@ -446,29 +446,31 @@ class NewsArticleService:
     ) -> bool:
         """
         Update an article after interview enrichment.
+        Creates embedding, sets published status and extracts title from H1.
         """
         try:
-            # Convert markdown to body blocks and derive lead
-            blocks = self._convert_markdown_to_html_blocks(markdown_content)
-            lead = (
-                markdown_content.split("\n\n", 1)[0].strip()
-                if markdown_content
-                else None
-            )
-            summary_val = summary or (markdown_content[:300] + "...")
-
-            # LUO EMBEDDING!
             from sentence_transformers import SentenceTransformer
-
+            import datetime
+            import re
+            
+            # Pura otsikko H1:stä
+            title_match = re.match(r'^#\s+(.+?)$', markdown_content, re.MULTILINE)
+            if title_match:
+                lead = title_match.group(1).strip()
+            else:
+                # Fallback
+                lead = markdown_content.split("\n\n", 1)[0].strip().lstrip('#').strip()
+            
+            # Convert markdown to body blocks
+            blocks = self._convert_markdown_to_html_blocks(markdown_content)
+            summary_val = summary or (markdown_content[:300] + "...")
+            
+            # Create embedding
             model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
-
-            full_content = f"{lead}\n\n{markdown_content}" if lead else markdown_content
-            normalized = " ".join(full_content.split())
-            embedding = (
-                model.encode(normalized, normalize_embeddings=True)
-                .astype("float32")
-                .tolist()
-            )
+            normalized = " ".join(markdown_content.split())
+            embedding = model.encode(normalized, normalize_embeddings=True).astype("float32").tolist()
+            
+            published_at = datetime.datetime.now(datetime.timezone.utc)
 
             with psycopg.connect(self.db_dsn) as conn:
                 with conn.cursor() as cur:
@@ -480,6 +482,8 @@ class NewsArticleService:
                             lead = %s,
                             summary = %s,
                             embedding = %s::vector,
+                            status = 'published',
+                            published_at = %s,
                             required_corrections = FALSE,
                             revision_count = COALESCE(revision_count, 0) + %s,
                             updated_at = NOW()
@@ -490,16 +494,17 @@ class NewsArticleService:
                             Jsonb(blocks),
                             lead,
                             summary_val,
-                            embedding, 
+                            embedding,
+                            published_at,
                             revision_increment,
                             news_article_id,
                         ),
                     )
                     conn.commit()
-                    print(
-                        f"✅ Updated article {news_article_id} after interview with NEW EMBEDDING"
-                    )
+                    print(f"✅ Article {news_article_id} enriched with interview and published!")
                     return True
         except Exception as e:
             print(f"❌ Error updating article after interview: {e}")
+            import traceback
+            traceback.print_exc()
             return False

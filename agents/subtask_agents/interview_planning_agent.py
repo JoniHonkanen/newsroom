@@ -570,18 +570,20 @@ Teppo AI Journalist
 
     ## TEHTÄVÄ:
     Luo {num_questions} kysymystä, jotka:
-    1. Ovat hieman muodollisempia ja syvempiä kuin puhelussa.
-    2. Käsittelevät vain yhtä aihetta per kysymys.
-    3. Hyödyntävät sitä, että haastateltava voi miettiä vastausta rauhassa.
-    4. Voivat pyytää konkreettisia esimerkkejä tai taustatietoja.
-    5. Ovat täysin suomenkielisiä.
+    1. Ovat keskustelevia ja luonnollisia, vaikkakin hieman syvällisempiä kuin puhelimessa
+    2. Alkavat pehmeästi, esim. "Kerrotko...", "Mitä ajattelet...", "Miten näet..."
+    3. Käsittelevät yhtä aihetta per kysymys, mutta ilman akateemista jargonia
+    4. Pyytävät mielellään konkreettisia esimerkkejä tai henkilökohtaisia kokemuksia
+    5. Kuulostavat siltä kuin journalisti kysyisi kahvipöydässä - ystävällisesti ja aidosti kiinnostuneena
 
     ## OHJEET:
     - Luo yksi kysymys kutakin asiantuntemusaluetta kohden (max 3)
-    - Lisää yksi yleinen kysymys
-    - Kysymysten tulee olla loogisessa järjestyksessä (tärkein ensin)
-    - Käytä sanoja kuten "Analysoi", "Pohdi", "Kuvaile yksityiskohtaisesti"
-    - Pyydä tarvittaessa esimerkkejä tai käytännön kokemuksia
+    - Lisää yksi yleinen, yhteenvetävä kysymys
+    - Kysymysten tulee olla loogisessa järjestyksessä (aloita helpoimmasta)
+    - VÄLTÄ sanoja kuten "Analysoi", "Pohdi", "Kuvaile yksityiskohtaisesti"
+    - KÄYTÄ mieluummin: "Kerrotko", "Mitä ajattelet", "Miten näet", "Voitko kertoa"
+    - Pyydä esimerkkejä luonnollisesti: "Tulisiko mieleesi joku esimerkki..."
+    - Pidä sävy ystävällisenä mutta ammattimaisena
     """
 
         # Pydantic-malli

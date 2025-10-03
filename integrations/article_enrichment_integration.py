@@ -73,7 +73,7 @@ class ArticleEnrichmentIntegration:
 
                 # Use enriched content as-is - LLM should handle title formatting properly
                 # No need to add extra H1 title since LLM produces complete markdown
-                final_markdown = enrichment_result.enriched_content.strip()
+                final_markdown = f"# {enrichment_result.enriched_title}\n\n{enrichment_result.enriched_content.strip()}"
 
                 # Update existing news_article using service
                 updated = self.article_service.update_article_after_interview(
