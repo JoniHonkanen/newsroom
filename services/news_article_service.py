@@ -446,17 +446,29 @@ class NewsArticleService:
     ) -> bool:
         """
         Update an article after interview enrichment.
-
-        - Recomputes body_blocks from markdown
-        - Updates lead (first paragraph), summary, markdown_content
-        - Increments revision_count
-        - Clears required_corrections (False)
         """
         try:
             # Convert markdown to body blocks and derive lead
             blocks = self._convert_markdown_to_html_blocks(markdown_content)
-            lead = markdown_content.split("\n\n", 1)[0].strip() if markdown_content else None
+            lead = (
+                markdown_content.split("\n\n", 1)[0].strip()
+                if markdown_content
+                else None
+            )
             summary_val = summary or (markdown_content[:300] + "...")
+
+            # LUO EMBEDDING!
+            from sentence_transformers import SentenceTransformer
+
+            model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+
+            full_content = f"{lead}\n\n{markdown_content}" if lead else markdown_content
+            normalized = " ".join(full_content.split())
+            embedding = (
+                model.encode(normalized, normalize_embeddings=True)
+                .astype("float32")
+                .tolist()
+            )
 
             with psycopg.connect(self.db_dsn) as conn:
                 with conn.cursor() as cur:
@@ -467,6 +479,7 @@ class NewsArticleService:
                             body_blocks = %s,
                             lead = %s,
                             summary = %s,
+                            embedding = %s::vector,
                             required_corrections = FALSE,
                             revision_count = COALESCE(revision_count, 0) + %s,
                             updated_at = NOW()
@@ -477,12 +490,15 @@ class NewsArticleService:
                             Jsonb(blocks),
                             lead,
                             summary_val,
+                            embedding, 
                             revision_increment,
                             news_article_id,
                         ),
                     )
                     conn.commit()
-                    print(f"✅ Updated article {news_article_id} after interview enrichment")
+                    print(
+                        f"✅ Updated article {news_article_id} after interview with NEW EMBEDDING"
+                    )
                     return True
         except Exception as e:
             print(f"❌ Error updating article after interview: {e}")
