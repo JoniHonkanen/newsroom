@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: newsroom_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-newsroom}
+      POSTGRES_USER: ${DB_USER:-news}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-news}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-news}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - newsroom
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: newsroom_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+    expose:
+      - "8000"
+    volumes:
+      - ./static:/app/static
+    networks:
+      - newsroom
+
+  graphql:
+    build:
+      context: .
+      dockerfile: Dockerfile.graphql
+    container_name: newsroom_graphql
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - STATIC_FILE_PATH=/app/static
+    expose:
+      - "4000"
+    volumes:
+      - ./static:/app/static
+    networks:
+      - newsroom
+
+  agents:
+    build:
+      context: .
+      dockerfile: Dockerfile.agents
+    container_name: newsroom_agents
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - SENTENCE_TRANSFORMERS_HOME=/app/.cache/sentence_transformers
+    volumes:
+      - ./static:/app/static
+      - transformers_cache:/app/.cache
+    networks:
+      - newsroom
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: newsroom_nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - graphql
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./static:/usr/share/nginx/html/static:ro
+    networks:
+      - newsroom
+
+volumes:
+  postgres_data:
+  transformers_cache:
+
+networks:
+  newsroom:
+    driver: bridge
