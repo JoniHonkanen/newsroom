@@ -1,5 +1,8 @@
 conversations_log
 static/
+docker-compose.override.yml
+
+nginx/ssl/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

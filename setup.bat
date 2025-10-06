@@ -63,7 +63,8 @@ if not exist "nginx\ssl\fullchain.pem" (
             exit /b 1
         )
         
-        openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout nginx\ssl\privkey.pem -out nginx\ssl\fullchain.pem -subj "/C=FI/ST=Pirkanmaa/L=Tampere/O=Dev/CN=localhost" 2>nul
+        REM Luo molemmat sertifikaatit ilman -subj (välttää Git Bash ongelman)
+        echo | openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout nginx\ssl\privkey.pem -out nginx\ssl\fullchain.pem -batch 2>nul
         
         if exist "nginx\ssl\fullchain.pem" (
             echo OK: Certificates created
