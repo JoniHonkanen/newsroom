@@ -26,7 +26,7 @@ jobs:
           
           # Tallenna vanhat containerit varmuuden vuoksi
           echo "📦 Saving current state..."
-          docker-compose ps > deployment_backup_$(date +%Y%m%d_%H%M%S).txt
+          docker compose ps > deployment_backup_$(date +%Y%m%d_%H%M%S).txt
           
           # Hae uusin koodi
           echo "📥 Pulling latest code..."
@@ -41,15 +41,15 @@ jobs:
           
           # Pysäytä vanhat containerit
           echo "🛑 Stopping old containers..."
-          docker-compose down
+          docker compose down
           
           # Buildaa uudet imaget
           echo "🏗️  Building new images..."
-          docker-compose build --no-cache
+          docker compose build --no-cache
           
           # Käynnistä uudet containerit
           echo "▶️  Starting new containers..."
-          docker-compose up -d
+          docker compose up -d
           
           # Odota että servicet käynnistyvät
           echo "⏳ Waiting for services..."
@@ -57,7 +57,7 @@ jobs:
           
           # Tarkista että kaikki servicet toimii
           echo "🔍 Checking service health..."
-          docker-compose ps
+          docker compose ps
           
           # Tarkista backend health
           if curl -k -f https://localhost/health >/dev/null 2>&1; then
@@ -68,11 +68,11 @@ jobs:
           
           # Näytä lokit viimeisiltä riveiltä
           echo "📋 Recent logs:"
-          docker-compose logs --tail=20
+          docker compose logs --tail=20
           
           echo "✅ Deployment complete!"
           echo "📊 Service status:"
-          docker-compose ps
+          docker compose ps
 
     - name: Notify on Success
       if: success()
