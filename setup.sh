@@ -53,62 +53,13 @@ if ! grep -q "OPENAI_API_KEY=sk-" .env; then
     fi
 fi
 
-# Luo nginx-kansiot
-echo "📁 Creating nginx directories..."
-mkdir -p nginx/ssl
-
-# Tarkista SSL-sertifikaatit
-if [ ! -f nginx/ssl/fullchain.pem ] || [ ! -f nginx/ssl/privkey.pem ]; then
-    echo "🔐 SSL certificates not found."
-    echo ""
-    echo "Choose certificate type:"
-    echo "  1) Self-signed (for development/testing)"
-    echo "  2) Let's Encrypt (for production)"
-    echo "  3) I'll add them manually later"
-    echo ""
-    read -p "Enter choice (1-3): " cert_choice
-    
-    case $cert_choice in
-        1)
-            echo "Creating self-signed certificates..."
-            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-                -keyout nginx/ssl/privkey.pem \
-                -out nginx/ssl/fullchain.pem \
-                -subj "/C=FI/ST=Pirkanmaa/L=Tampere/O=Dev/CN=localhost" \
-                2>/dev/null
-            chmod 644 nginx/ssl/*.pem
-            echo "✅ Self-signed certificates created"
-            ;;
-        2)
-            echo ""
-            echo "For Let's Encrypt certificates:"
-            echo "1. Stop nginx if running: docker-compose stop nginx"
-            echo "2. Run: sudo certbot certonly --standalone -d your-domain.com"
-            echo "3. Copy certificates:"
-            echo "   sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem nginx/ssl/"
-            echo "   sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem nginx/ssl/"
-            echo "   sudo chmod 644 nginx/ssl/*.pem"
-            echo ""
-            read -p "Press Enter after you've added certificates..."
-            ;;
-        3)
-            echo "⚠️  Remember to add certificates to nginx/ssl/ before starting nginx"
-            ;;
-        *)
-            echo "Invalid choice. Creating self-signed certificates..."
-            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-                -keyout nginx/ssl/privkey.pem \
-                -out nginx/ssl/fullchain.pem \
-                -subj "/C=FI/ST=Pirkanmaa/L=Tampere/O=Dev/CN=localhost" \
-                2>/dev/null
-            chmod 644 nginx/ssl/*.pem
-            ;;
-    esac
-fi
-
-# Luo static-kansio
-echo "📁 Creating static directory..."
+# Luo tarvittavat kansiot
+echo "📁 Creating necessary directories..."
+mkdir -p npm/data
+mkdir -p npm/letsencrypt
 mkdir -p static
+
+echo "✅ Directories created"
 
 # Tarkista Docker
 if ! command -v docker &> /dev/null; then
@@ -116,22 +67,36 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! command -v docker-compose &> /dev/null; then
+if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
     echo "❌ docker-compose is not installed!"
     exit 1
 fi
+
+echo "✅ Docker is installed"
 
 # Rakenna imaget
 echo ""
 echo "🏗️  Building Docker images..."
 echo "   This may take 5-10 minutes on first run..."
 echo ""
-docker-compose build
+docker compose build
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ Build failed"
+    exit 1
+fi
 
 # Käynnistä servicet
 echo ""
 echo "🚀 Starting services..."
-docker-compose up -d
+docker compose up -d
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ Failed to start services"
+    exit 1
+fi
 
 # Odota että servicet käynnistyvät
 echo ""
@@ -141,7 +106,7 @@ sleep 15
 # Tarkista status
 echo ""
 echo "🔍 Checking service status..."
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "✅ Setup complete!"
@@ -149,20 +114,35 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📊 SERVICES:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  🌐 Main URL:     https://localhost"
-echo "  📊 GraphQL:      https://localhost/graphql"
-echo "  🏥 Health:       https://localhost/health"
-echo "  📚 API Docs:     https://localhost/docs"
-echo "  📁 Static files: https://localhost/static/"
+echo "  🌐 Nginx Proxy Manager: http://YOUR_IP:81"
+echo "     Default login: admin@example.com / changeme"
+echo "     ⚠️  CHANGE PASSWORD IMMEDIATELY!"
+echo ""
+echo "  📊 Backend API:      http://YOUR_IP:8000/docs"
+echo "  📊 GraphQL:          http://YOUR_IP:4000/graphql"
+echo "  🏥 Health:           http://YOUR_IP:8000/health"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔐 NEXT STEPS - NGINX PROXY MANAGER:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "1. Open http://YOUR_IP:81"
+echo "2. Login with: admin@example.com / changeme"
+echo "3. Change password immediately"
+echo "4. Add Proxy Host for your domain:"
+echo "   - Domain: api.yourdomain.com"
+echo "   - Forward to: backend:8000"
+echo "   - Enable WebSocket Support"
+echo "   - Request SSL Certificate (Let's Encrypt)"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔧 USEFUL COMMANDS:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  View logs:       docker-compose logs -f"
-echo "  Stop all:        docker-compose down"
-echo "  Restart service: docker-compose restart backend"
-echo "  Check status:    docker-compose ps"
+echo "  View logs:       docker compose logs -f"
+echo "  View NPM logs:   docker compose logs -f npm"
+echo "  Stop all:        docker compose down"
+echo "  Restart service: docker compose restart backend"
+echo "  Check status:    docker compose ps"
 echo ""
-echo "⚠️  Note: If using self-signed certificates, you'll get"
-echo "   browser warnings. Use curl -k or accept the certificate."
+echo "⚠️  Remember to update .env with:"
+echo "   LOCALTUNNEL_URL=https://api.yourdomain.com"
 echo ""
