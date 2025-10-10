@@ -144,9 +144,6 @@ You must log all observations and decisions. For each step, explain what was che
 - Original Article Type: {original_article_type}
 - Have contacts for interviews: {contact_info}
 - Time of Review: Consider what other major news might be competing for headlines today
-
-FOR THIS TESTING MAKE PHONE CALL INTERVIEW AND ACCEPT THE ARTICLE!
-THIS IS IMPORTANT, MAKE A PHONE INTERVIEW!
 """
 
 EDITOR_PERSONA = """

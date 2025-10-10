@@ -1,6 +1,47 @@
-# GraphQL service requirements
--r requirements-base.txt
+# GraphQL Service Requirements
+# Optimized for Strawberry GraphQL + FastAPI + PostgreSQL
 
-# GraphQL
+# ============ Database ============
+asyncpg==0.30.0
+psycopg==3.2.10
+psycopg-binary==3.2.10
+
+# ============ Web Framework ============
+fastapi==0.117.1
+uvicorn==0.37.0
+starlette==0.48.0
+
+# ============ GraphQL ============
 strawberry-graphql==0.282.0
 graphql-core==3.2.6
+
+# ============ Data Validation & Serialization ============
+pydantic==2.11.9
+pydantic_core==2.33.2
+email-validator==2.3.0
+
+# ============ Utilities ============
+python-dotenv==1.1.1
+certifi==2025.8.3
+idna==3.10
+urllib3==2.5.0
+typing_extensions==4.14.1
+
+# ============ Async Support ============
+anyio==4.11.0
+sniffio==1.3.1
+h11==0.16.0
+
+# ============ Common Dependencies ============
+MarkupSafe==3.0.2
+packaging==25.0
+attrs==25.3.0
+annotated-types==0.7.0
+click==8.3.0
+
+# ============ HTTP Core (required by FastAPI/Starlette) ============
+httpcore==1.0.9
+httpx==0.28.1
+
+# ============ Low-level dependencies ============
+six==1.17.0
