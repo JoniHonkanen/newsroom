@@ -170,7 +170,7 @@ class Query:
                     FROM news_article na
                     JOIN news_article_category nac ON na.id = nac.article_id
                     JOIN category c ON c.id = nac.category_id
-                    WHERE c.slug = $1 AND COALESCE(na.featured, false) = false
+                    WHERE c.slug = $1
                     {order_clause}
                     LIMIT $2 OFFSET $3
                 """
