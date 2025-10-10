@@ -7,36 +7,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    wget \
-    gnupg \
-    ca-certificates \
-    unzip \
-    fonts-liberation \
-    libnss3 \
-    libxss1 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libdrm2 \
-    libgbm1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libxkbcommon0 \
-    libasound2 \
-    libpangocairo-1.0-0 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libgdk-pixbuf-2.0-0 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libxshmfence1 \
-    libxi6 \
-    libxcursor1 \
-    libxfixes3 \
-    libxslt1.1 \
-    libxml2 \
-    postgresql-client \
+    curl wget gnupg ca-certificates unzip \
+    fonts-liberation libnss3 libxss1 libatk-bridge2.0-0 \
+    libatk1.0-0 libdrm2 libgbm1 libxcomposite1 libxdamage1 \
+    libxrandr2 libxkbcommon0 libasound2 libpangocairo-1.0-0 \
+    libpango-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 libglib2.0-0 \
+    libgtk-3-0 libxshmfence1 libxi6 libxcursor1 libxfixes3 \
+    libxslt1.1 libxml2 postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-linux-signing-keyring.gpg \
@@ -47,13 +24,12 @@ RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor
 
 ENV CHROME_BIN=/usr/bin/google-chrome
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-base.txt requirements-agents.txt ./
+RUN pip install --no-cache-dir -r requirements-agents.txt
 
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')"
 
 COPY . .
-
 RUN mkdir -p /app/static /app/.cache
 
 CMD ["python", "main.py"]

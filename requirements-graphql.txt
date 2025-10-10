@@ -1,0 +1,6 @@
+# GraphQL service requirements
+-r requirements-base.txt
+
+# GraphQL
+strawberry-graphql==0.282.0
+graphql-core==3.2.6
