@@ -2,6 +2,8 @@
 
 import sys
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # Add the project root to the Python path FIRST
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -101,6 +103,7 @@ Decide whether this article requires additional interviews to provide balanced, 
 **Interview method considerations:**
 - **Phone**: For urgent breaking news, immediate expert reactions
 - **Email**: For detailed analysis, technical explanations, non-urgent topics
+- **Quiet hours policy**: Phone interviews only between 08:00–18:00 (Europe/Helsinki). Outside these hours, use email if it is possible.
 
 **Expertise areas to consider:**
 - Subject matter experts (technology, economy, law, medicine, etc.)
@@ -140,6 +143,7 @@ You must log all observations and decisions. For each step, explain what was che
 - Published: {published_at}
 - Original Article Type: {original_article_type}
 - Have contacts for interviews: {contact_info}
+- Current local time (Europe/Helsinki): {current_local_time}
 - Time of Review: Consider what other major news might be competing for headlines today
 """
 
@@ -349,6 +353,8 @@ class EditorInChiefAgent(BaseAgent):
         print(self.active_prompt)
 
         # Prepare the prompt
+        fi_now = datetime.now(ZoneInfo("Europe/Helsinki"))
+        fi_time_str = fi_now.strftime("%Y-%m-%d %H:%M %Z")
         prompt_content = EDITOR_IN_CHIEF_PROMPT.format(
             persona=self.active_prompt,  # get persona from db, or use default
             article_title=article.enriched_title,
@@ -360,6 +366,7 @@ class EditorInChiefAgent(BaseAgent):
             published_at=article.published_at,
             original_article_type=article.original_article_type or "unknown",
             contact_info=contact_info,
+            current_local_time=fi_time_str,
         )
 
         # if you want check how prompts look like, you can uncomment this line
