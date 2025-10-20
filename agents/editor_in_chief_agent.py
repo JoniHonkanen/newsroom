@@ -21,9 +21,6 @@ from schemas.agent_state import AgentState
 from schemas.enriched_article import EnrichedArticle
 from services.editor_review_service import EditorialReviewService
 
-# TODO:: SKEEMASSA KÄYTETÄÄN KAHDESSA KOHTAAN "reconsideration", mikä voi sekoittaa kielimallin! EditorialReasoning.reconsideration ja ReviewedNewsItem.reconsideration
-# TODO:: KORJAA!! Tämä vaikuttaa myös tietokantaan jne...
-
 EDITOR_IN_CHIEF_PROMPT = """
 {persona}
 
@@ -179,11 +176,6 @@ Your headline selection criteria prioritize:
 5. Competitive positioning against other news sources
 """
 
-
-# TODO:: Meillä on tieto alkuperäisestä artikkelityypistä, sekä onko meillä yhteystietoja...
-# TODO:: Nämä seikat voisivat vaikuttaa siihen, tarvitaanko haastatteluja vai ei.
-# TODO:: ESIM jos tyyppinä "press release" ja yhteystiedot löytyy, niin voidaan haastatella...
-# TODO:: Jos uutinen saa arvoksi "high", niin voidaan harkita puhelinhaastatteluja...
 class EditorInChiefAgent(BaseAgent):
     """An agent that reviews enriched articles for legal, ethical, and editorial compliance, including headline news assessment."""
 

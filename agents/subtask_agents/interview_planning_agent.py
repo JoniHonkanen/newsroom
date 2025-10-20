@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 import json
 from dotenv import load_dotenv
+from utils.contact_utils import get_random_phone_from_env, get_random_email_from_env
 
 load_dotenv()
 
@@ -208,8 +209,8 @@ class InterviewPlanningAgent(BaseAgent):
 
         # Use the pre-selected contact
         email_contact = selected_contact.get("email") if selected_contact else None
-        if not email_contact:
-            email_contact = "ei-sahkopostia@example.com"
+        # Prefer random recipient from CONTACT_EMAIL_LIST for testing; fallback to contact email
+        email_contact = get_random_email_from_env(email_contact) or "ei-sahkopostia@example.com"
 
         # Get article language
         article_language = getattr(article, "language", "fi")
@@ -504,12 +505,13 @@ Teppo AI Journalist
                     break
 
         if selected:
+            # Prefer random number from CONTACT_PHONE_LIST for testing; fallback to selected.phone
+            rand_phone = get_random_phone_from_env() or selected.phone
             return {
                 "name": selected.name,
                 "title": selected.title,
                 "organization": selected.organization,
-                # "to_number": selected.phone,
-                "to_number": os.getenv("CONTACT_PERSON_PHONE"),
+                "to_number": rand_phone,
                 "contact_type": selected.contact_type,
                 "context": selected.extraction_context,
             }

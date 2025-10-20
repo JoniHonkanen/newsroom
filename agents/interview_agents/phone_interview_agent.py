@@ -8,6 +8,7 @@ import psycopg
 from schemas.agent_state import AgentState
 from schemas.interview_schema import InterviewPlan, PhoneInterviewPlan
 from dotenv import load_dotenv
+from utils.contact_utils import get_random_phone_from_env
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -67,14 +68,9 @@ class PhoneInterviewExecutionAgent:
             # Hae language phone_script_json:sta
             language = phone_script_json.get("language", "fi")
 
-            # payload = {
-            #    "phone_number": phone_plan.to_number,
-            #    "language": language,
-            #    "phone_script_json": phone_script_json,
-            #    "article_id": article_id,
-            # }
+            # Use the to_number from the plan (already randomized upstream)
             payload = {
-                "phone_number": os.getenv("CONTACT_PERSON_PHONE"),
+                "phone_number": phone_plan.to_number,
                 "language": language,
                 "phone_script_json": phone_script_json,
                 "article_id": article_id,
@@ -229,7 +225,7 @@ if __name__ == "__main__":
 
     # Yksinkertaistettu PhoneInterviewPlan
     phone_plan = PhoneInterviewPlan(
-        to_number=os.getenv("CONTACT_PERSON_PHONE"),
+        to_number=get_random_phone_from_env(os.getenv("CONTACT_PERSON_PHONE")),
         from_number=None,
         phone_script_json=phone_script_json,
     )

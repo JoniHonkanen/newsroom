@@ -30,10 +30,9 @@ class EmailInterviewExecutionAgent:
             plain_text = email_plan.formatted_email_body
             html_body = self._convert_to_html(email_plan.formatted_email_body)
 
-            # TODO::: THIS IS STILL FOR TESTING... WE USE OUR OWN EMAIL TO CONTACT...
+            # Send to the recipient defined in the plan (randomized from CONTACT_EMAIL_LIST upstream)
             success, message, msg_id = self._send_email(
-                to=os.getenv("CONTACT_PERSON_EMAIL"),
-                # to=email_plan.recipient,
+                to=email_plan.recipient,
                 subject=email_plan.subject,
                 plain_text=plain_text,
                 html_body=html_body,
