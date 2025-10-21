@@ -17,10 +17,11 @@ app = FastAPI(title="News GraphQL API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",      # Frontend main
-        "http://localhost:3001",      # Frontend admin
-        "https://*.vercel.app",       # Vercel deployments
-        "https://*.netlify.app",      # Jos käytät Netlify
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://gptnewsroom.fi",
+        "https://www.gptnewsroom.fi",
+        "https://newsroom-production-frontend-9nk2ur374-joni-honkanens-projects.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
