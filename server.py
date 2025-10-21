@@ -28,6 +28,15 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Newsroom API", version="1.0.0", description="Admin + Callbacks + Twilio API"
 )
+from fastapi.staticfiles import StaticFiles
+
+# Static files
+static_dir = "/app/static"
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    print(f"✅ Serving static files from: {static_dir}")
+else:
+    print(f"⚠️  Warning: Static directory not found: {static_dir}")
 
 # CORS
 app.add_middleware(
