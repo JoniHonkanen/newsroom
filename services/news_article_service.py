@@ -262,9 +262,14 @@ class NewsArticleService:
         Save an enriched article to the database.
         Returns the ID of the created database record.
         """
-        # Extract the lead paragraph (first sentence or paragraph)
-        content_parts = article.enriched_content.split("\n\n", 1)
-        lead = content_parts[0].strip()
+        # Lead is used as the headline in the frontend → prefer enriched_title, fallback to first paragraph
+        content_parts = (
+            article.enriched_content.split("\n\n", 1)
+            if article.enriched_content
+            else [""]
+        )
+        lead_from_content = content_parts[0].strip()
+        lead = (getattr(article, "enriched_title", "") or "").strip() or lead_from_content
 
         # Convert markdown to HTML blocks
         body_blocks = self._convert_markdown_to_html_blocks(article.enriched_content)
@@ -419,7 +424,8 @@ class NewsArticleService:
                         (
                             article.enriched_content,
                             Jsonb(body_blocks),
-                            article.enriched_content.split("\n\n", 1)[0].strip(),
+                            ((getattr(article, "enriched_title", "") or "").strip() 
+                             or (article.enriched_content.split("\n\n", 1)[0].strip() if article.enriched_content else "")),
                             article.summary,
                             True,
                             article.revision_count,
