@@ -1,0 +1,52 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Asenna tarvittavat paketit
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Asenna vain email_processor:in tarvitsemat riippuvuudet
+RUN pip install --no-cache-dir \
+    imapclient==3.0.1 \
+    psycopg[binary]==3.2.3 \
+    python-dotenv==1.0.1 \
+    mailparser-reply==0.4.1 \
+    langchain-openai==0.2.10 \
+    langchain==0.3.13
+
+# Kopioi vain tarvittavat tiedostot (ei kaikkea)
+COPY email_processor.py .
+COPY integrations/article_enrichment_integration.py ./integrations/
+COPY integrations/__init__.py ./integrations/
+COPY agents/interview_agents/article_enricher_agent.py ./agents/interview_agents/
+COPY agents/interview_agents/__init__.py ./agents/interview_agents/
+COPY agents/base_agent.py ./agents/
+COPY agents/__init__.py ./agents/
+COPY schemas/*.py ./schemas/
+COPY services/news_article_service.py ./services/
+COPY services/__init__.py ./services/
+COPY .env .
+
+# Luo wrapper-skripti joka ajaa email_processor.py 15 minuutin välein
+RUN echo '#!/bin/bash\n\
+echo "🔍 Email Processor starting..."\n\
+echo "⏰ Checking emails every 15 minutes"\n\
+echo ""\n\
+while true; do\n\
+    echo "📧 [$(date +"%Y-%m-%d %H:%M:%S")] Checking for new email replies..."\n\
+    python email_processor.py\n\
+    EXIT_CODE=$?\n\
+    if [ $EXIT_CODE -eq 0 ]; then\n\
+        echo "✅ Email check completed successfully"\n\
+    else\n\
+        echo "❌ Email check failed with exit code: $EXIT_CODE"\n\
+    fi\n\
+    echo "⏳ Sleeping for 15 minutes..."\n\
+    echo ""\n\
+    sleep 900\n\
+done' > /app/run_email_processor.sh && chmod +x /app/run_email_processor.sh
+
+CMD ["/app/run_email_processor.sh"]
