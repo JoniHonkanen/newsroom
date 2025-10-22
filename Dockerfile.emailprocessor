@@ -13,9 +13,11 @@ RUN pip install --no-cache-dir \
     imapclient==3.0.1 \
     psycopg[binary]==3.2.3 \
     python-dotenv==1.0.1 \
-    email-reply-parser==0.5.12 \
     langchain-openai==0.2.10 \
-    langchain==0.3.13
+    langchain==0.3.13 \
+    email-validator==2.3.0 \
+    Markdown==3.9 \
+    mail-parser-reply==1.35
 
 # Kopioi vain tarvittavat tiedostot (ei kaikkea)
 COPY email_processor.py .
@@ -27,7 +29,6 @@ COPY agents/base_agent.py ./agents/
 COPY agents/__init__.py ./agents/
 COPY schemas/*.py ./schemas/
 COPY services/news_article_service.py ./services/
-COPY .env .
 
 # Luo tyhjä __init__.py jos ei ole olemassa
 RUN touch ./services/__init__.py ./integrations/__init__.py ./agents/__init__.py ./agents/interview_agents/__init__.py ./schemas/__init__.py

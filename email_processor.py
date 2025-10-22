@@ -8,7 +8,7 @@ from imapclient import IMAPClient
 from email.message import Message
 from dotenv import load_dotenv
 from typing import Any, Dict, List
-from email_reply_parser import EmailReplyParser
+from mailparser_reply import EmailReplyParser
 
 import psycopg
 from integrations.article_enrichment_integration import enrich_article_with_email_reply
