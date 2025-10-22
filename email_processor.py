@@ -292,9 +292,19 @@ def _extract_body(msg: Message) -> str:
     return ""
 
 
+def check_and_process_emails():
+    """
+    Main entry point for checking and processing email replies.
+    This is called from main.py background thread.
+    """
+    load_dotenv()  # Varmista että env-muuttujat on ladattu
+    try:
+        read_email_tool(folder="INBOX", unseen_only=True)
+    except Exception as e:
+        print(f"Error in check_and_process_emails: {e}")
+        raise
+
+
 if __name__ == "__main__":
     # From email folder "INBOX", read only unseen emails and process them
-    read_email_tool(
-        folder="INBOX",
-        unseen_only=True,
-    )
+    check_and_process_emails()

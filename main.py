@@ -24,6 +24,8 @@ from langchain.chat_models import init_chat_model
 import yaml
 import time
 import os
+import threading
+from email_processor import check_and_process_emails
 
 # THIS IS THE AGENT SYSTEM THAT GENERATES, REVIEWS, EDITS, INTERVIEWS AND PUBLISHES NEWS ARTICLES
 
@@ -42,6 +44,25 @@ NEWS_PLANNING_PROMPT = "Plan article: {article_text} / {published_date}"
 with open("newsfeeds.yaml") as f:
     config = yaml.safe_load(f)
 feeds = [NewsFeedConfig(**feed) for feed in config["feeds"]]
+
+
+def run_email_checker():
+    """Tarkista sähköpostit 15 min välein taustasäikeenä"""
+    print("🔍 Email Processor starting in background...")
+    print("⏰ Checking emails every 15 minutes")
+    print("")
+    
+    while True:
+        try:
+            print(f"📧 [{time.strftime('%Y-%m-%d %H:%M:%S')}] Checking for new email replies...")
+            check_and_process_emails()
+            print("✅ Email check completed successfully")
+        except Exception as e:
+            print(f"❌ Email check failed: {e}")
+        
+        print("⏳ Sleeping for 15 minutes...")
+        print("")
+        time.sleep(900)  # 15 min
 
 
 def has_articles(state):
@@ -316,6 +337,12 @@ if __name__ == "__main__":
     )
     graph_builder.add_edge("handle_follow_ups", "editorial_batch")
     graph = graph_builder.compile()
+
+    # Käynnistä email checker taustasäikeenä
+    email_thread = threading.Thread(target=run_email_checker, daemon=True)
+    email_thread.start()
+    print("✅ Email processor background thread started")
+    print("")
 
     # Run the agent graph in a loop to continuously fetch and process news articles
     while True:

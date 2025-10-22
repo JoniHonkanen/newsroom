@@ -86,23 +86,6 @@ services:
     networks:
       - newsroom
 
-  email_processor:
-    build:
-      context: .
-      dockerfile: Dockerfile.emailprocessor
-    container_name: newsroom_email_processor
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-    networks:
-      - newsroom
-
   npm:
     image: 'jc21/nginx-proxy-manager:latest'
     container_name: nginx-proxy-manager
