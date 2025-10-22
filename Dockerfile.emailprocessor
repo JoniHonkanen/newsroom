@@ -27,8 +27,10 @@ COPY agents/base_agent.py ./agents/
 COPY agents/__init__.py ./agents/
 COPY schemas/*.py ./schemas/
 COPY services/news_article_service.py ./services/
-COPY services/__init__.py ./services/
 COPY .env .
+
+# Luo tyhjä __init__.py jos ei ole olemassa
+RUN touch ./services/__init__.py ./integrations/__init__.py ./agents/__init__.py ./agents/interview_agents/__init__.py ./schemas/__init__.py
 
 # Luo wrapper-skripti joka ajaa email_processor.py 15 minuutin välein
 RUN echo '#!/bin/bash\n\
