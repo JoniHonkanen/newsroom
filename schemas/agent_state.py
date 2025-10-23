@@ -32,6 +32,8 @@ class AgentState(BaseModel):
     pending_interviews: List[Any] = Field(default_factory=list)
     pending_revisions: List[Any] = Field(default_factory=list)
     interview_plan: Optional[InterviewPlan] = Field(default=None)
+    published_articles: List[Any] = Field(default_factory=list) 
+    rejected_articles: List[Any] = Field(default_factory=list) 
 
 class InterviewAgentState(AgentState):
     current_article: Optional[Any] = None

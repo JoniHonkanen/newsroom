@@ -193,62 +193,88 @@ def create_editorial_subgraph():
 # We can use this function to process a batch of articles through editorial review
 def process_editorial_batch(state: AgentState):
     """Process all enriched articles through editorial review using subgraph."""
+    
     if not hasattr(state, "enriched_articles") or not state.enriched_articles:
         print("No enriched articles to review")
         return state
 
-    published_articles = []
-    pending_interviews = []
-    pending_revisions = []
-    rejected_articles = []
+    # ✅ Käytä staten kenttiä suoraan (ne on nyt määritelty schemassa)
+    # Tyhjennä vanhat tulokset
+    state.published_articles = []
+    state.pending_interviews = []
+    state.pending_revisions = []
+    state.rejected_articles = []
 
     # Here is all the subgraph, here we handle one article at a time
     editorial_subgraph = create_editorial_subgraph()
 
-    print(f"Editorial review for {len(state.enriched_articles)} articles...")
+    print(f"\n{'='*70}")
+    print(f"📊 EDITORIAL BATCH: Processing {len(state.enriched_articles)} articles...")
+    print(f"{'='*70}\n")
 
     for i, article in enumerate(state.enriched_articles):
         try:
+            print(f"\n{'-'*70}")
             print(
-                f"Reviewing article {i+1}/{len(state.enriched_articles)}: {getattr(article, 'enriched_title', 'Untitled')[:50]}..."
+                f"📰 Article {i+1}/{len(state.enriched_articles)}: {getattr(article, 'enriched_title', 'Untitled')[:50]}..."
             )
+            print(f"{'-'*70}")
 
             # Create state for single article review
             article_state = AgentState(current_article=article)
 
             # Process through editorial subgraph
-            editorial_subgraph.invoke(article_state)
-
-            # KORJATTU: Lue päätös suoraan article_state:sta (jossa review_result on)
-            if hasattr(article_state, "review_result") and article_state.review_result:
-                decision = article_state.review_result.editorial_decision
+            print("🔄 Invoking editorial subgraph...")
+            result_state = editorial_subgraph.invoke(article_state)  # Tallenna tulos
+            
+            # TARKISTA ETTÄ SUBGRAPH TODELLA PÄÄTTYI OIKEIN
+            if result_state is None:
+                print(f"⚠️ Subgraph returned None for article {i+1} - treating as rejected")
+                state.rejected_articles.append(article)
+                continue
+            
+            # Käytä result_state:a eikä article_state:a
+            if hasattr(result_state, "review_result") and result_state.review_result:
+                decision = result_state.review_result.editorial_decision
                 print(f"🔍 Editorial decision: {decision}")
 
                 if decision == "publish":
-                    published_articles.append(article)
+                    state.published_articles.append(article)
                     print(
-                        f"✅ Article published: {getattr(article, 'enriched_title', 'Unknown')[:30]}..."
+                        f"   ✅ Article PUBLISHED: {getattr(article, 'enriched_title', 'Unknown')[:40]}..."
                     )
                 elif decision == "interview":
-                    pending_interviews.append(article)
+                    state.pending_interviews.append(article)
                     print(
-                        f"🎤 Article needs interview: {getattr(article, 'enriched_title', 'Unknown')[:30]}..."
+                        f"   🎤 Article needs INTERVIEW: {getattr(article, 'enriched_title', 'Unknown')[:40]}..."
                     )
                 elif decision == "revise":
-                    pending_revisions.append(article)
+                    state.pending_revisions.append(article)
                     print(
-                        f"🔧 Article needs revision: {getattr(article, 'enriched_title', 'Unknown')[:30]}..."
+                        f"   🔧 Article needs REVISION: {getattr(article, 'enriched_title', 'Unknown')[:40]}..."
                     )
-                else:  # reject
-                    rejected_articles.append(article)
+                elif decision == "reject":
+                    state.rejected_articles.append(article)
                     print(
-                        f"❌ Article rejected: {getattr(article, 'enriched_title', 'Unknown')[:30]}..."
+                        f"   ❌ Article REJECTED: {getattr(article, 'enriched_title', 'Unknown')[:40]}..."
                     )
+                else:
+                    print(f"   ⚠️ Unknown decision: '{decision}' - treating as rejected")
+                    state.rejected_articles.append(article)
+            else:
+                print(f"   ⚠️ No review_result found in state after subgraph - treating as rejected")
+                state.rejected_articles.append(article)
 
         except Exception as e:
-            print(f"Error in editorial review {i+1}: {e}")
-            rejected_articles.append(article)
+            print(f"\n❌ ERROR in editorial review for article {i+1}:")
+            print(f"   Exception: {e}")
+            import traceback
+            traceback.print_exc()
+            state.rejected_articles.append(article)
             continue
+        
+    state.enriched_articles = []
+    return state
 
 
 def handle_follow_up_work(state: AgentState):
