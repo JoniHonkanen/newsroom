@@ -129,14 +129,19 @@ class FixValidationAgent(BaseAgent):
                 or HeadlineNewsAssessment(
                     featured=False, reasoning="Rejected due to excessive revisions."
                 ),
-                editorial_warning=previous_review.editorial_warning,
                 interview_decision=previous_review.interview_decision
                 or InterviewDecision(
                     interview_needed=False,
+                    interview_method=None,  # ← KORJATTU: None eikä "none"
+                    target_expertise_areas=[],
+                    interview_focus=None,  # ← KORJATTU: None eikä "N/A"
+                    justification="Article rejected.",
+                    article_type_influence=None,  # ← KORJATTU: None eikä "N/A"
                 ),
             )
 
             state.review_result = rejection_review
+            print("🚫 Automatic rejection complete. Exiting validation immediately.")
             return state
 
         # Tarkista onko spesifisiä issues tai epäonnistuneita kriteerejä
@@ -226,6 +231,7 @@ class FixValidationAgent(BaseAgent):
                 else:
                     print("❌ FAILED: Some issues remain.")
 
+                    # Luo uusi issue lista jäljellä olevista ongelmista
                     new_issues_for_reviser = [
                         ReviewIssue(
                             type="Other",
@@ -251,7 +257,6 @@ class FixValidationAgent(BaseAgent):
                             reasoning_steps=[],
                         ),
                         headline_news_assessment=previous_review.headline_news_assessment,
-                        editorial_warning=previous_review.editorial_warning,
                         interview_decision=previous_review.interview_decision,
                     )
 
@@ -287,156 +292,3 @@ class FixValidationAgent(BaseAgent):
                 traceback.print_exc()
 
         return state
-
-
-if __name__ == "__main__":
-    from dotenv import load_dotenv
-    from langchain.chat_models import init_chat_model
-    from schemas.agent_state import AgentState
-    from schemas.enriched_article import EnrichedArticle, ArticleReference, LocationTag
-    from schemas.editor_in_chief_schema import (
-        ReviewedNewsItem,
-        ReviewIssue,
-        EditorialReasoning,
-        HeadlineNewsAssessment,
-        InterviewDecision,
-    )
-    import os
-
-    load_dotenv()
-    
-    # Run with command:
-    # python -m agents.subtask_agents.editor_in_chief_validate_fixes
-
-    # Initialize the LLM
-    try:
-        llm = init_chat_model("gpt-4o-mini", model_provider="openai")
-        print("✅ LLM initialized successfully")
-    except Exception as e:
-        print(f"❌ Error initializing LLM: {e}")
-        exit(1)
-
-    # Create a revised article that should address some issues
-    revised_article = EnrichedArticle(
-        article_id="test-article-fix-validation",
-        canonical_news_id=789,
-        news_article_id=3,
-        enriched_title="Hallitus nostaa veroja – perustelut ja vastineet mukana",
-        enriched_content="""
-# Hallitus nostaa veroja – perustelut ja vastineet mukana
-
-Hallitus päätti tänään nostaa veroja. Päätöstä perusteltiin taloudellisilla haasteilla ja tarpeella turvata julkiset palvelut.
-
-## Opposition ja hallituksen näkemykset
-
-Opposition johtaja kommentoi päätöstä kriittisesti, mutta hallitus vastasi, että veronkorotukset ovat välttämättömiä. Hallituksen mukaan päätös tehtiin laajan asiantuntija-arvion pohjalta.
-
-## Toteutusaikataulu
-
-Veronkorotukset astuvat voimaan ensi vuoden alussa.
-        """.strip(),
-        published_at="2024-01-16T10:00:00Z",
-        generated_at="2024-01-16T12:00:00Z",
-        source_domain="test.fi",
-        keywords=["hallitus", "verot", "politiikka"],
-        categories=["Politiikka"],
-        language="fi",
-        sources=["https://example.com/government-decision"],
-        references=[
-            ArticleReference(
-                title="Hallituksen tiedote", url="https://government.fi/taxes"
-            )
-        ],
-        locations=[
-            LocationTag(
-                continent="Europe",
-                region="Southern Finland",
-                country="Finland",
-                city="Helsinki",
-            )
-        ],
-        summary="Hallitus päätti nostaa veroja, perustelut ja vastineet mukana.",
-        enrichment_status="success",
-        original_article_type="news",
-        contacts=[],
-        required_corrections=True,
-        revision_count=1,
-    )
-
-    # Create a previous review with issues that need to be checked
-    previous_review = ReviewedNewsItem(
-        status="ISSUES_FOUND",
-        editorial_decision="revise",
-        issues=[
-            ReviewIssue(
-                type="Accuracy",
-                location="Ensimmäinen kappale",
-                description="Päätöksen perustelut puuttuvat.",
-                suggestion="Lisää hallituksen perustelut päätökselle.",
-            ),
-            ReviewIssue(
-                type="Ethics",
-                location="Opposition johtajan lainaus",
-                description="Opposition kritiikkiä ei ole tasapainotettu hallituksen vastineella.",
-                suggestion="Lisää hallituksen kommentti opposition kritiikkiin.",
-            ),
-            ReviewIssue(
-                type="Accuracy",
-                location="Viimeinen lause",
-                description="Toteutusaikataulu puuttuu.",
-                suggestion="Lisää tieto, milloin veronkorotukset astuvat voimaan.",
-            ),
-        ],
-        editorial_reasoning=EditorialReasoning(
-            reviewer="EditorInChiefAgent",
-            initial_decision="REJECT",
-            checked_criteria=["Accuracy", "Ethics"],
-            failed_criteria=["Accuracy", "Ethics"],
-            reasoning_steps=[],
-            explanation="Article needs more balanced reporting and factual details.",
-        ),
-        headline_news_assessment=HeadlineNewsAssessment(
-            featured=False,
-            reasoning="Important topic, but needs fixes before featuring.",
-        ),
-        editorial_warning=None, 
-        interview_decision=InterviewDecision(
-            interview_needed=False,
-        ),
-    )
-
-    # Compose the agent state as it would be before fix validation
-    initial_state = AgentState(
-        current_article=revised_article,
-        review_result=previous_review,
-        enriched_articles=[revised_article],
-        reviewed_articles=[],
-    )
-
-    # Initialize the FixValidationAgent
-    from agents.subtask_agents.editor_in_chief_validate_fixes import FixValidationAgent
-
-    fixer_validation_agent = FixValidationAgent(llm)
-
-    print("\n--- Invoking the agent's run method... ---")
-    result_state = fixer_validation_agent.run(initial_state)
-    print("--- Agent run completed. ---")
-
-    print("\n--- Results ---")
-    if result_state.review_result:
-        review = result_state.review_result
-        print(f"Validation status: {review.status}")
-        print(f"Editorial decision: {review.editorial_decision}")
-        if review.issues:
-            print(f"Issues remaining after validation ({len(review.issues)}):")
-            for i, issue in enumerate(review.issues, 1):
-                print(f"  {i}. {issue.type} - {issue.location}: {issue.description}")
-        else:
-            print("✅ All required fixes verified, no issues remain.")
-        if review.editorial_reasoning:
-            print(f"\nReasoning summary: {review.editorial_reasoning.explanation}")
-    else:
-        print("❌ No review result found.")
-
-# Agent flow (before and after):
-# ... -> article_fixer_agent -> FIX_VALIDATION_AGENT (WE ARE HERE) -> next agent ...
