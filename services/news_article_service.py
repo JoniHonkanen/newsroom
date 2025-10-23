@@ -4,7 +4,7 @@ import sys
 import os
 import re
 import markdown
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 import psycopg  # type: ignore
 from psycopg.types.json import Jsonb  # type: ignore
@@ -302,7 +302,7 @@ class NewsArticleService:
             body_blocks=body_blocks,
             markdown_content=article.enriched_content,  # Tallennetaan alkuperäinen markdown
             published_at=None,
-            updated_at=datetime.now(),
+            updated_at=datetime.now(timezone.utc),
             enrichment_status=enrichment_status,
             original_article_type=article.original_article_type,
             hero_image_url=article.hero_image_url,

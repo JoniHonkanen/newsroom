@@ -103,7 +103,7 @@ Decide whether this article requires additional interviews to provide balanced, 
 **Interview method considerations:**
 - **Phone**: For urgent breaking news, immediate expert reactions
 - **Email**: For detailed analysis, technical explanations, non-urgent topics
-- **Quiet hours policy**: Phone interviews only between 08:00–18:00 (Europe/Helsinki). Outside these hours, use email if it is possible.
+- **Quiet hours policy**: Phone interviews are suitable during 08:00–18:00 (Europe/Helsinki) when a prompt verbal response or back-and-forth is needed. If a call cannot be arranged or is inconvenient, proceed by email.
 
 **Expertise areas to consider:**
 - Subject matter experts (technology, economy, law, medicine, etc.)
