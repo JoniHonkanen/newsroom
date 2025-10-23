@@ -129,14 +129,10 @@ class FixValidationAgent(BaseAgent):
                 or HeadlineNewsAssessment(
                     featured=False, reasoning="Rejected due to excessive revisions."
                 ),
+                editorial_warning=previous_review.editorial_warning,
                 interview_decision=previous_review.interview_decision
                 or InterviewDecision(
                     interview_needed=False,
-                    interview_method="none",
-                    target_expertise_areas=[],
-                    interview_focus="N/A",
-                    justification="Article rejected.",
-                    article_type_influence="N/A",
                 ),
             )
 
@@ -255,6 +251,7 @@ class FixValidationAgent(BaseAgent):
                             reasoning_steps=[],
                         ),
                         headline_news_assessment=previous_review.headline_news_assessment,
+                        editorial_warning=previous_review.editorial_warning,
                         interview_decision=previous_review.interview_decision,
                     )
 

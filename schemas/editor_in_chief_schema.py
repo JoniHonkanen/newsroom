@@ -1,6 +1,6 @@
 # Editorial Review Schemas
 from typing import List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ReasoningStep(BaseModel):
@@ -114,6 +114,7 @@ class ReviewedNewsItem(BaseModel):
         default=None, description="Final reconsideration result, if applicable"
     )
     editorial_warning: Optional[EditorialWarning] = Field(
+        default=None,
         description="Structured warning to readers; required if status is 'RECONSIDERATION'",
     )
     headline_news_assessment: HeadlineNewsAssessment = Field(
@@ -125,3 +126,10 @@ class ReviewedNewsItem(BaseModel):
     editorial_decision: Literal["publish", "interview", "revise", "reject"] = Field(
         description="Final editorial routing decision based on review"
     )
+
+    @model_validator(mode="after")
+    def _require_warning_for_reconsideration(cls, values: "ReviewedNewsItem") -> "ReviewedNewsItem":
+        """Ensure reconsideration decisions include a warning."""
+        if values.status == "RECONSIDERATION" and values.editorial_warning is None:
+            raise ValueError("editorial_warning is required when status is RECONSIDERATION")
+        return values
