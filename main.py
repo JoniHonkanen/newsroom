@@ -51,15 +51,17 @@ def run_email_checker():
     print("🔍 Email Processor starting in background...")
     print("⏰ Checking emails every 15 minutes")
     print("")
-    
+
     while True:
         try:
-            print(f"📧 [{time.strftime('%Y-%m-%d %H:%M:%S')}] Checking for new email replies...")
+            print(
+                f"📧 [{time.strftime('%Y-%m-%d %H:%M:%S')}] Checking for new email replies..."
+            )
             check_and_process_emails()
             print("✅ Email check completed successfully")
         except Exception as e:
             print(f"❌ Email check failed: {e}")
-        
+
         print("⏳ Sleeping for 15 minutes...")
         print("")
         time.sleep(900)  # 15 min
@@ -185,7 +187,6 @@ def process_editorial_batch(state: AgentState):
         print("No enriched articles to review")
         return state
 
-    # Here is all the subgraph, here we handle one article at a time
     editorial_subgraph = create_editorial_subgraph()
 
     print(f"\n{'='*70}")
@@ -200,31 +201,20 @@ def process_editorial_batch(state: AgentState):
             )
             print(f"{'-'*70}")
 
-            # Create state for single article review
             article_state = AgentState(current_article=article)
-
-            # Process through editorial subgraph
-            print("🔄 Invoking editorial subgraph...")
             result_state = editorial_subgraph.invoke(article_state)
-            
+
             if result_state is None:
                 print(f"⚠️ Subgraph returned None for article {i+1}")
                 continue
-            
-            if hasattr(result_state, "review_result") and result_state.review_result:
-                decision = result_state.review_result.editorial_decision
-                print(f"🔍 Editorial decision: {decision}")
-            else:
-                print(f"⚠️ No review_result found in state after subgraph")
 
         except Exception as e:
             print(f"\n❌ ERROR in editorial review for article {i+1}:")
             print(f"   Exception: {e}")
             import traceback
+
             traceback.print_exc()
             continue
-        
-    state.enriched_articles = []
     return state
 
 
@@ -282,7 +272,7 @@ if __name__ == "__main__":
     graph_builder.add_edge("article_image_generator", "article_storer")
     graph_builder.add_edge("article_storer", "editorial_batch")
     graph_builder.add_edge("editorial_batch", END)
-    
+
     graph = graph_builder.compile()
 
     # Käynnistä email checker taustasäikeenä
