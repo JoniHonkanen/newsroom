@@ -4,7 +4,7 @@ on:
   push:
     branches: 
       - main
-  workflow_dispatch:  # Mahdollistaa manuaalisen käynnistyksen
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -21,67 +21,59 @@ jobs:
         script: |
           echo "🚀 Starting deployment..."
           
-          # Siirry projektikansioon
           cd ${{ secrets.PROJECT_PATH || '/opt/newsroom' }}
           
-          # Tallenna vanhat containerit varmuuden vuoksi
-          echo "📦 Saving current state..."
-          docker compose ps > deployment_backup_$(date +%Y%m%d_%H%M%S).txt
-          
-          # Hae uusin koodi
           echo "📥 Pulling latest code..."
           git fetch origin
+          
+          # Tarkista muuttuiko docker-compose.yml
+          NEEDS_BUILD=false
+          if git diff HEAD origin/main --name-only | grep -q "docker-compose.yml"; then
+            echo "🏗️ docker-compose.yml changed - will rebuild"
+            NEEDS_BUILD=true
+          else
+            echo "⏩ docker-compose.yml unchanged - skipping build"
+          fi
+          
           git reset --hard origin/main
           
-          # Tarkista .env tiedosto
           if [ ! -f .env ]; then
             echo "❌ ERROR: .env file missing!"
             exit 1
           fi
           
-          # Pysäytä vanhat containerit
           echo "🛑 Stopping old containers..."
           docker compose down
           
-          # Buildaa uudet imaget
-          echo "🏗️  Building new images..."
-          docker compose build --no-cache
+          if [ "$NEEDS_BUILD" = true ]; then
+            echo "🏗️ Building images..."
+            docker compose build --no-cache
+          fi
           
-          # Käynnistä uudet containerit
-          echo "▶️  Starting new containers..."
+          echo "▶️ Starting containers..."
           docker compose up -d
           
-          # Odota että servicet käynnistyvät
           echo "⏳ Waiting for services..."
           sleep 20
           
-          # Tarkista että kaikki servicet toimii
           echo "🔍 Checking service health..."
           docker compose ps
           
-          # Tarkista backend health
           if curl -k -f https://localhost/health >/dev/null 2>&1; then
             echo "✅ Backend is healthy"
           else
-            echo "⚠️  Warning: Backend health check failed"
+            echo "⚠️ Warning: Backend health check failed"
           fi
           
-          # Näytä lokit viimeisiltä riveiltä
           echo "📋 Recent logs:"
           docker compose logs --tail=20
           
           echo "✅ Deployment complete!"
-          echo "📊 Service status:"
-          docker compose ps
 
     - name: Notify on Success
       if: success()
-      run: |
-        echo "✅ Deployment successful!"
-        echo "Time: $(date)"
+      run: echo "✅ Deployment successful at $(date)"
         
     - name: Notify on Failure
       if: failure()
-      run: |
-        echo "❌ Deployment failed!"
-        echo "Check the logs above for details"
+      run: echo "❌ Deployment failed - check logs"
