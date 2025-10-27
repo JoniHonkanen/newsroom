@@ -73,18 +73,6 @@ def has_articles(state):
     return "end"
 
 
-# IF THERE IS STILL AFTER WORKS AFTER EDITORIAL BATCH (need to re check the articles etc...)
-# TODO::: WE might need to change this at some point!
-def has_pending_work(state: AgentState):
-    """Check if there are interviews to conduct or revisions to make."""
-    pending_interviews = getattr(state, "pending_interviews", [])
-    pending_revisions = getattr(state, "pending_revisions", [])
-
-    if pending_interviews or pending_revisions:
-        return "handle_follow_ups"
-    return "end"
-
-
 # Editor in Chief decision -> "publish", "interview", "revise", "reject"
 def get_editorial_decision(state: AgentState):
     """Route based on editor-in-chief review result."""
@@ -193,17 +181,9 @@ def create_editorial_subgraph():
 # We can use this function to process a batch of articles through editorial review
 def process_editorial_batch(state: AgentState):
     """Process all enriched articles through editorial review using subgraph."""
-    
     if not hasattr(state, "enriched_articles") or not state.enriched_articles:
         print("No enriched articles to review")
         return state
-
-    # ✅ Käytä staten kenttiä suoraan (ne on nyt määritelty schemassa)
-    # Tyhjennä vanhat tulokset
-    state.published_articles = []
-    state.pending_interviews = []
-    state.pending_revisions = []
-    state.rejected_articles = []
 
     # Here is all the subgraph, here we handle one article at a time
     editorial_subgraph = create_editorial_subgraph()
@@ -225,78 +205,26 @@ def process_editorial_batch(state: AgentState):
 
             # Process through editorial subgraph
             print("🔄 Invoking editorial subgraph...")
-            result_state = editorial_subgraph.invoke(article_state)  # Tallenna tulos
+            result_state = editorial_subgraph.invoke(article_state)
             
-            # TARKISTA ETTÄ SUBGRAPH TODELLA PÄÄTTYI OIKEIN
             if result_state is None:
-                print(f"⚠️ Subgraph returned None for article {i+1} - treating as rejected")
-                state.rejected_articles.append(article)
+                print(f"⚠️ Subgraph returned None for article {i+1}")
                 continue
             
-            # Käytä result_state:a eikä article_state:a
             if hasattr(result_state, "review_result") and result_state.review_result:
                 decision = result_state.review_result.editorial_decision
                 print(f"🔍 Editorial decision: {decision}")
-
-                if decision == "publish":
-                    state.published_articles.append(article)
-                    print(
-                        f"   ✅ Article PUBLISHED: {getattr(article, 'enriched_title', 'Unknown')[:40]}..."
-                    )
-                elif decision == "interview":
-                    state.pending_interviews.append(article)
-                    print(
-                        f"   🎤 Article needs INTERVIEW: {getattr(article, 'enriched_title', 'Unknown')[:40]}..."
-                    )
-                elif decision == "revise":
-                    state.pending_revisions.append(article)
-                    print(
-                        f"   🔧 Article needs REVISION: {getattr(article, 'enriched_title', 'Unknown')[:40]}..."
-                    )
-                elif decision == "reject":
-                    state.rejected_articles.append(article)
-                    print(
-                        f"   ❌ Article REJECTED: {getattr(article, 'enriched_title', 'Unknown')[:40]}..."
-                    )
-                else:
-                    print(f"   ⚠️ Unknown decision: '{decision}' - treating as rejected")
-                    state.rejected_articles.append(article)
             else:
-                print(f"   ⚠️ No review_result found in state after subgraph - treating as rejected")
-                state.rejected_articles.append(article)
+                print(f"⚠️ No review_result found in state after subgraph")
 
         except Exception as e:
             print(f"\n❌ ERROR in editorial review for article {i+1}:")
             print(f"   Exception: {e}")
             import traceback
             traceback.print_exc()
-            state.rejected_articles.append(article)
             continue
         
     state.enriched_articles = []
-    return state
-
-
-def handle_follow_up_work(state: AgentState):
-    """Handle interviews and revisions from editorial decisions."""
-
-    print("Handling follow-up work...")
-    if hasattr(state, "pending_interviews") and state.pending_interviews:
-        print(f"TODO: Process {len(state.pending_interviews)} interview articles")
-        # For now, just move them back to enriched_articles for re-review
-        if not hasattr(state, "enriched_articles"):
-            state.enriched_articles = []
-        state.enriched_articles.extend(state.pending_interviews)
-        state.pending_interviews = []
-
-    if hasattr(state, "pending_revisions") and state.pending_revisions:
-        print(f"TODO: Process {len(state.pending_revisions)} revision articles")
-        # For now, just move them back to enriched_articles for re-review
-        if not hasattr(state, "enriched_articles"):
-            state.enriched_articles = []
-        state.enriched_articles.extend(state.pending_revisions)
-        state.pending_revisions = []
-
     return state
 
 
@@ -331,7 +259,6 @@ if __name__ == "__main__":
 
     # FROM THIS WE START EDITORIAL REVIEW -> ONE ARTICLE AT A TIME - SO WE'LL USE A SUBGRAPH
     graph_builder.add_node("editorial_batch", process_editorial_batch)
-    graph_builder.add_node("handle_follow_ups", handle_follow_up_work)
 
     # EDGES
     graph_builder.add_edge(START, "feed_reader")
@@ -354,14 +281,8 @@ if __name__ == "__main__":
     graph_builder.add_edge("article_generator", "article_image_generator")
     graph_builder.add_edge("article_image_generator", "article_storer")
     graph_builder.add_edge("article_storer", "editorial_batch")
-
-    # Check for pending work after editorial batch
-    graph_builder.add_conditional_edges(
-        source="editorial_batch",
-        path=has_pending_work,
-        path_map={"handle_follow_ups": "handle_follow_ups", "end": END},
-    )
-    graph_builder.add_edge("handle_follow_ups", "editorial_batch")
+    graph_builder.add_edge("editorial_batch", END)
+    
     graph = graph_builder.compile()
 
     # Käynnistä email checker taustasäikeenä
