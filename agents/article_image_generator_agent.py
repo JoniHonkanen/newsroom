@@ -3,6 +3,8 @@ import os
 import requests
 import re
 import random
+import asyncio
+import logging
 from typing import List, Dict, Optional, Tuple
 from urllib.parse import quote
 from pathlib import Path
@@ -14,22 +16,93 @@ from agents.base_agent import BaseAgent
 from schemas.agent_state import AgentState
 from schemas.enriched_article import EnrichedArticle
 
+try:
+    from runware import Runware, IImageInference
+    RUNWARE_AVAILABLE = True
+except ImportError:
+    RUNWARE_AVAILABLE = False
+    print("⚠️  Warning: Runware SDK not available. Will use Pixabay only.")
+
 
 class ArticleImageGeneratorAgent(BaseAgent):
-    """An agent that generates and adds relevant images to enriched articles using Pixabay API."""
+    """An agent that generates and adds relevant images to enriched articles.
+    
+    Uses AI image generation (Runware) as primary method and Pixabay API as fallback.
+    """
 
     def __init__(
-        self, pixabay_api_key: str, image_storage_path: str = "static/images/articles"
+        self,
+        pixabay_api_key: str,
+        runware_api_key: Optional[str] = None,
+        image_storage_path: str = "static/images/articles",
+        use_ai_generation: bool = True,
     ):
         super().__init__(llm=None, prompt=None, name="ArticleImageGeneratorAgent")
+        
+        self.logger = logging.getLogger(__name__)
+        
         self.pixabay_api_key = pixabay_api_key
+        self.runware_api_key = runware_api_key or os.getenv("RUNWARE_API_KEY")
+        self.use_ai_generation = use_ai_generation and RUNWARE_AVAILABLE
+        
         self.image_storage_path = Path(image_storage_path)
         self.image_storage_path.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize Runware if available
+        self.runware = None
+        if self.use_ai_generation and self.runware_api_key:
+            self.runware = Runware(api_key=self.runware_api_key)
+            print("✅ Runware AI image generation enabled")
+        elif self.use_ai_generation:
+            print("⚠️  Warning: RUNWARE_API_KEY not provided, falling back to Pixabay only")
+            self.use_ai_generation = False
+
+    async def _generate_ai_image(self, prompt: str, negative_prompt: Optional[str] = None) -> Optional[str]:
+        """Generate an image using Runware AI - returns image URL directly"""
+        if not self.runware:
+            return None
+            
+        try:
+            # Connect to Runware if not connected
+            if not hasattr(self, '_runware_connected'):
+                await self.runware.connect()
+                self._runware_connected = True
+            
+            # Prepare image generation request
+            request = IImageInference(
+                positivePrompt=prompt,
+                negativePrompt=negative_prompt or "blurry, low quality, distorted, watermark, text",
+                width=1024,  # Mobile portrait: 9:16 aspect ratio
+                height=576,  # Taller than wide for mobile
+                model="runware:100@1",  # CHEAP MODEL
+                steps=5,  # Good balance between quality and speed
+                CFGScale=7,  # High prompt adherence
+                numberResults=1,
+                outputType="URL",  # Get URL directly
+                outputFormat="WEBP",  # Better compression than JPG
+                outputQuality=85,  # Good quality without max size
+                scheduler="DPM++ 2M Karras",  # Efficient scheduler for good quality
+            )
+            
+            # Generate image
+            images = await self.runware.imageInference(requestImage=request)
+            
+            if images and len(images) > 0:
+                image_url = images[0].imageURL
+                self.logger.info(f"✅ AI generated image: {image_url}")
+                return image_url
+            else:
+                self.logger.error("❌ No images returned from AI generation")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to generate AI image: {e}")
+            return None
 
     def _search_pixabay_image(
         self, search_term: str, language: str = "en", used_images: set = None
     ) -> Optional[str]:
-        """Search for a single relevant image from Pixabay."""
+        """Search for a single relevant image from Pixabay (fallback method)."""
         if used_images is None:
             used_images = set()
 
@@ -86,100 +159,20 @@ class ArticleImageGeneratorAgent(BaseAgent):
         self, markdown_content: str
     ) -> List[Tuple[str, str]]:
         """Extract all image placeholders from markdown content.
+
         Returns list of tuples: (full_match, alt_text)
+        e.g., [('![main topic](PLACEHOLDER_IMAGE)', 'main topic'), ...]
         """
+        # Match markdown image placeholders: ![alt text](PLACEHOLDER_IMAGE)
         pattern = r"!\[([^\]]*)\]\(PLACEHOLDER_IMAGE\)"
         matches = re.findall(pattern, markdown_content)
 
-        placeholders = []
-        for match in matches:
-            alt_text = match.strip()
-            full_match = f"![{alt_text}](PLACEHOLDER_IMAGE)"
-            placeholders.append((full_match, alt_text))
+        # Return both full match and alt text
+        full_matches = re.finditer(pattern, markdown_content)
+        return [(match.group(0), match.group(1)) for match in full_matches]
 
-        print(f"     - Found {len(placeholders)} image placeholders")
-        for i, (_, alt_text) in enumerate(placeholders, 1):
-            print(f"       {i}. '{alt_text}'")
-
-        return placeholders
-
-    def _get_search_terms_for_image(
-        self,
-        alt_text: str,
-        article: EnrichedArticle,
-        placeholder_index: int,
-        used_llm_suggestions: set,
-    ) -> Tuple[List[str], str]:
-        """Get search terms for an image, prioritizing LLM suggestions.
-        Returns (search_terms, primary_llm_suggestion_used)
-        """
-        search_terms = []
-        primary_llm_suggestion = None
-
-        # 1. FIRST PRIORITY: Use LLM's image_suggestions if available
-        if hasattr(article, "image_suggestions") and article.image_suggestions:
-            print(
-                f"           - LLM image suggestions available: {article.image_suggestions}"
-            )
-
-            # Try to match placeholder index to suggestion index (if not already used)
-            if placeholder_index < len(article.image_suggestions):
-                llm_suggestion = article.image_suggestions[placeholder_index]
-                if llm_suggestion not in used_llm_suggestions:
-                    search_terms.append(llm_suggestion)
-                    primary_llm_suggestion = llm_suggestion
-                    print(
-                        f"           - Using LLM suggestion #{placeholder_index + 1}: '{llm_suggestion}'"
-                    )
-
-            # Add other unused LLM suggestions as backup
-            for suggestion in article.image_suggestions:
-                if (
-                    suggestion not in search_terms
-                    and suggestion not in used_llm_suggestions
-                ):
-                    search_terms.append(suggestion)
-
-        # 2. SECOND PRIORITY: Use the alt_text from placeholder
-        if alt_text not in search_terms:
-            search_terms.append(alt_text)
-
-        # 3. THIRD PRIORITY: Make search term more specific with article context
-        specific_term = self._make_search_term_specific(alt_text, article)
-        if specific_term not in search_terms:
-            search_terms.append(specific_term)
-
-        # 4. LAST RESORT: Category-based fallback terms
-        fallback_terms = self._fallback_search_terms(
-            article.categories, article.language
-        )
-        search_terms.extend(fallback_terms)
-
-        return search_terms[:5], primary_llm_suggestion  # Limit to 5 search terms
-
-    def _make_search_term_specific(
-        self, alt_text: str, article: EnrichedArticle
-    ) -> str:
-        """Make search term more specific by combining with article context."""
-        # Use article categories or keywords to make search more specific
-        context_words = []
-
-        if article.categories:
-            context_words.extend(article.categories[:1])  # Take first category
-
-        if article.keywords:
-            context_words.extend(article.keywords[:2])  # Take first 2 keywords
-
-        # Combine alt_text with context
-        if context_words:
-            specific_term = f"{alt_text} {' '.join(context_words[:2])}"
-            return specific_term[:50]  # Limit length
-
-        return alt_text
-
-    def _fallback_search_terms(self, categories: List[str], language: str) -> List[str]:
+    def _get_fallback_search_terms(self, categories: List[str]) -> List[str]:
         """Generate fallback search terms based on article categories."""
-
         # Category to search term mapping
         category_mapping = {
             "politiikka": ["government", "politics", "finland"],
@@ -213,7 +206,7 @@ class ArticleImageGeneratorAgent(BaseAgent):
     def _download_and_save_image(
         self, image_url: str, article_title: str, image_index: int
     ) -> Optional[str]:
-        """Download image from Pixabay and save it locally."""
+        """Download image from URL and save it locally."""
         try:
             # Create unique filename from article title
             from datetime import datetime
@@ -229,7 +222,15 @@ class ArticleImageGeneratorAgent(BaseAgent):
 
             # Add date and image index
             date_str = datetime.now().strftime("%Y%m%d")
-            filename = f"{clean_title}_{image_index}_{date_str}.jpg"
+            
+            # Determine file extension from URL
+            extension = "jpg"
+            if ".webp" in image_url.lower():
+                extension = "webp"
+            elif ".png" in image_url.lower():
+                extension = "png"
+                
+            filename = f"{clean_title}_{image_index}_{date_str}.{extension}"
             local_path = self.image_storage_path / filename
 
             print(f"           - Downloading image to: {local_path}")
@@ -252,103 +253,159 @@ class ArticleImageGeneratorAgent(BaseAgent):
             print(f"           - Error downloading image: {e}")
             return None
 
+    async def _get_image_for_search_term_async(
+        self, search_term: str, used_images: set, article_language: str = "en"
+    ) -> Optional[str]:
+        """Get image for a search term - tries AI generation first, then Pixabay fallback"""
+        
+        # Try AI generation first if enabled
+        if self.use_ai_generation and self.runware:
+            print(f"           - Trying AI generation for: '{search_term}'")
+            
+            # Enhance prompt for better results
+            enhanced_prompt = f"professional news photography, {search_term}, high quality, clear, editorial style"
+            negative_prompt = "blurry, low quality, distorted, watermark, text, logo, caption"
+            
+            ai_image_url = await self._generate_ai_image(enhanced_prompt, negative_prompt)
+            
+            if ai_image_url:
+                print(f"           - ✅ Successfully generated AI image")
+                return ai_image_url
+            else:
+                print(f"           - ⚠️ AI generation failed, falling back to Pixabay")
+        
+        # Fallback to Pixabay
+        print(f"           - Using Pixabay fallback for: '{search_term}'")
+        return self._search_pixabay_image(search_term, article_language, used_images)
+
     def _process_article_images(self, article: EnrichedArticle) -> EnrichedArticle:
         """Process all images in an enriched article."""
-
-        print(f"     - Processing images for: {article.enriched_title[:60]}...")
+        print(f"     - Article: {article.enriched_title[:50]}...")
 
         # Extract all image placeholders
         placeholders = self._extract_image_placeholders(article.enriched_content)
 
         if not placeholders:
-            print(f"     - No image placeholders found in article")
+            print(f"     - No image placeholders found")
             return article
 
-        # Show LLM suggestions if available
-        if hasattr(article, "image_suggestions") and article.image_suggestions:
-            print(
-                f"     - LLM provided {len(article.image_suggestions)} image suggestions: {article.image_suggestions}"
-            )
-        else:
-            print(f"     - No LLM image suggestions available, using fallback methods")
+        print(f"     - Found {len(placeholders)} image placeholder(s)")
 
-        # Process each placeholder
-        updated_content = article.enriched_content
+        # Track used images to avoid duplicates
+        used_images = set()
         hero_image_url = None
+        updated_content = article.enriched_content
         successful_replacements = 0
-        used_images = set()  # Track used images to avoid duplicates
-        used_llm_suggestions = set()  # Track used LLM suggestions to avoid duplicates
 
-        for i, (full_match, alt_text) in enumerate(placeholders):
-            print(f"     - Processing image {i+1}/{len(placeholders)}: '{alt_text}'")
+        # Get LLM image suggestions if available
+        llm_suggestions = getattr(article, "image_suggestions", []) or []
+        used_llm_suggestions = set()
 
-            # Get prioritized search terms for this image
-            search_terms, primary_llm_suggestion = self._get_search_terms_for_image(
-                alt_text, article, i, used_llm_suggestions
-            )
-            print(f"           - Search terms: {search_terms}")
+        # Run async image generation
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            for i, (full_match, alt_text) in enumerate(placeholders):
+                print(f"\n     - Processing placeholder {i+1}/{len(placeholders)}")
+                print(f"       Alt text: '{alt_text}'")
 
-            image_url = None
-            used_search_term = None
+                # Strategy: Use alt_text first, then LLM suggestions, then category fallbacks
+                search_terms = []
 
-            # Try each search term until we find an image
-            for search_term in search_terms:
-                print(f"           - Trying search term: '{search_term}'")
-                image_url = self._search_pixabay_image(
-                    search_term, article.language, used_images
-                )
-                if image_url:
-                    used_search_term = search_term
-                    break
+                # Primary: Use alt text if it's descriptive (more than 1 word or specific term)
+                if alt_text and len(alt_text.split()) >= 1:
+                    search_terms.append(alt_text)
+                    print(f"           - Using alt text as search term: '{alt_text}'")
 
-            # Only mark LLM suggestion as used if it was actually used for the image
-            if (
-                image_url
-                and used_search_term
-                and primary_llm_suggestion
-                and used_search_term == primary_llm_suggestion
-            ):
-                used_llm_suggestions.add(primary_llm_suggestion)
-                print(
-                    f"           - Marked LLM suggestion '{primary_llm_suggestion}' as used"
-                )
+                # Secondary: Try LLM suggestions that haven't been used yet
+                available_llm_suggestions = [
+                    s for s in llm_suggestions if s not in used_llm_suggestions
+                ]
+                if available_llm_suggestions:
+                    primary_llm_suggestion = available_llm_suggestions[0]
+                    search_terms.append(primary_llm_suggestion)
+                    used_llm_suggestions.add(primary_llm_suggestion)
+                    print(
+                        f"           - Using LLM suggestion: '{primary_llm_suggestion}'"
+                    )
 
-            if image_url:
-                # Add to used images set
-                used_images.add(image_url)
+                # Tertiary: Fallback to category-based terms
+                if not search_terms:
+                    fallback_terms = self._get_fallback_search_terms(article.categories)
+                    search_terms.extend(fallback_terms)
+                    print(
+                        f"           - Using fallback terms from categories: {fallback_terms}"
+                    )
 
-                # Download image locally
-                local_url = self._download_and_save_image(
-                    image_url, article.enriched_title, i + 1
-                )
+                # Try to get image for the first available search term
+                image_url = None
+                for term in search_terms:
+                    if term in used_llm_suggestions and term != search_terms[0]:
+                        # Already used this LLM suggestion
+                        continue
 
-                if local_url:
-                    # Handle hero image (first placeholder) separately
-                    if hero_image_url is None:
-                        hero_image_url = local_url
-                        # Remove the placeholder from the content instead of replacing it
-                        updated_content = updated_content.replace(
-                            full_match, ""
-                        ).strip()
-                        print(f"           - Set as hero image: {local_url}")
-                        print(f"           - Removed hero placeholder from content")
-                    else:
-                        # For other images, replace the placeholder in the content
-                        replacement = f"![{alt_text}]({local_url})"
-                        updated_content = updated_content.replace(
-                            full_match, replacement
+                    # Use async method to get image (AI or Pixabay)
+                    image_url = loop.run_until_complete(
+                        self._get_image_for_search_term_async(
+                            term, used_images, article.language
                         )
-                        print(f"           - Replaced placeholder in content")
+                    )
 
-                    successful_replacements += 1
+                    if image_url:
+                        print(f"           - Found image with term: '{term}'")
+                        break
+
+                # Mark LLM suggestion as used if we tried it
+                if len(search_terms) > 1 and search_terms[1] in llm_suggestions:
+                    primary_llm_suggestion = search_terms[1]
+                    used_llm_suggestions.add(primary_llm_suggestion)
+                    print(
+                        f"           - Marked LLM suggestion '{primary_llm_suggestion}' as used"
+                    )
+
+                if image_url:
+                    # Add to used images set
+                    used_images.add(image_url)
+
+                    # Download image locally (works for both AI and Pixabay URLs)
+                    local_url = self._download_and_save_image(
+                        image_url, article.enriched_title, i + 1
+                    )
+
+                    if local_url:
+                        # Handle hero image (first placeholder) separately
+                        if hero_image_url is None:
+                            hero_image_url = local_url
+                            # Remove the placeholder from the content instead of replacing it
+                            updated_content = updated_content.replace(
+                                full_match, ""
+                            ).strip()
+                            print(f"           - Set as hero image: {local_url}")
+                            print(f"           - Removed hero placeholder from content")
+                        else:
+                            # For other images, replace the placeholder in the content
+                            replacement = f"![{alt_text}]({local_url})"
+                            updated_content = updated_content.replace(
+                                full_match, replacement
+                            )
+                            print(f"           - Replaced placeholder in content")
+
+                        successful_replacements += 1
+                    else:
+                        # Remove placeholder if download failed
+                        updated_content = updated_content.replace(full_match, "")
+                        print(f"           - Removed placeholder {i+1} (download failed)")
                 else:
-                    # Remove placeholder if download failed
+                    # Remove placeholder if no image found
                     updated_content = updated_content.replace(full_match, "")
-                    print(f"           - Removed placeholder {i+1} (download failed)")
-            else:
-                # Remove placeholder if no image found
-                updated_content = updated_content.replace(full_match, "")
-                print(f"           - Removed placeholder {i+1} (no image found)")
+                    print(f"           - Removed placeholder {i+1} (no image found)")
+        finally:
+            # Cleanup async resources
+            if self.runware and hasattr(self, '_runware_connected'):
+                # Note: Runware SDK doesn't have explicit disconnect, but we can reset the flag
+                delattr(self, '_runware_connected')
+            loop.close()
 
         print(
             f"     - Successfully processed {successful_replacements}/{len(placeholders)} images"
@@ -379,6 +436,11 @@ class ArticleImageGeneratorAgent(BaseAgent):
         """Add relevant images to enriched articles."""
 
         print("ArticleImageGeneratorAgent: Starting to generate images for articles...")
+        
+        if self.use_ai_generation:
+            print("   - Using AI image generation (Runware) with Pixabay fallback")
+        else:
+            print("   - Using Pixabay only (AI generation disabled)")
 
         if not state.enriched_articles:
             print("ArticleImageGeneratorAgent: No enriched articles to process.")
@@ -404,6 +466,8 @@ class ArticleImageGeneratorAgent(BaseAgent):
 
             except Exception as e:
                 print(f"     - Error processing article images: {e}")
+                import traceback
+                traceback.print_exc()
                 # Keep original article if image processing fails
                 enhanced_articles.append(article)
 
@@ -423,8 +487,10 @@ if __name__ == "__main__":
     print("--- Testing ArticleImageGeneratorAgent in isolation ---")
     load_dotenv()
 
-    # Get Pixabay API key from environment
+    # Get API keys from environment
     pixabay_key = os.getenv("PIXABAY_API_KEY")
+    runware_key = os.getenv("RUNWARE_API_KEY")
+    
     if not pixabay_key:
         print("❌ PIXABAY_API_KEY not found in environment variables")
         exit(1)
@@ -479,10 +545,15 @@ This initiative represents Finland's commitment to technological advancement."""
     print(f"\nTest setup:")
     print(f"- Input articles: {len(test_state.enriched_articles)}")
     print(f"- Pixabay API key: {'✓' if pixabay_key else '✗'}")
+    print(f"- Runware API key: {'✓' if runware_key else '✗'}")
     print(f"- LLM image suggestions: {test_article.image_suggestions}")
 
     # Create and run the agent
-    image_agent = ArticleImageGeneratorAgent(pixabay_key)
+    image_agent = ArticleImageGeneratorAgent(
+        pixabay_api_key=pixabay_key,
+        runware_api_key=runware_key,
+        use_ai_generation=True  # Enable AI generation for test
+    )
 
     print("\n--- Running ArticleImageGeneratorAgent ---")
     result_state = image_agent.run(test_state)
