@@ -1,8 +1,9 @@
 # File: schemas/enriched_article.py
 
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime, timezone
+from enum import Enum
 
 from schemas.parsed_article import NewsContact
 
@@ -21,6 +22,10 @@ class LocationTag(BaseModel):
     country: Optional[str] = Field(description="Country, e.g., 'Finland'")
     region: Optional[str] = Field(description="Region or state, e.g., 'Pirkanmaa'")
     city: Optional[str] = Field(description="City or locality, e.g., 'Akaa'")
+    
+class ImageBriefKey(str, Enum):
+    HERO = "hero"
+    SUPPORTING = "supporting"
 
 
 # THIS IS WHAT WE SEND FOR LLM
@@ -46,6 +51,10 @@ class LLMArticleOutput(BaseModel):
     image_suggestions: List[str] = Field(
         default_factory=list,
         description="1-3 descriptive search terms for images that would fit this article",
+    )
+    image_generation_briefs: Dict[ImageBriefKey, str] = Field(
+        default_factory=dict,
+        description="Detailed AI image prompts keyed by hero/supporting",
     )
 
 
@@ -126,6 +135,10 @@ class EnrichedArticle(BaseModel):
     )
     image_suggestions: List[str] = Field(
         default_factory=list, description="LLM suggested image search terms"
+    )
+    image_generation_briefs: Dict[ImageBriefKey, str] = Field(
+        default_factory=dict,
+        description="Structured AI image prompts passed to the image agent",
     )
 
 

@@ -82,15 +82,18 @@ These elements are metadata, not news content.
 **IMPORTANT - Image Placeholders:**
 17. Include strategic image placeholders in your markdown:
    - ONE hero/main image at the very beginning: ![main topic](PLACEHOLDER_IMAGE)
-   - ONE supporting image after the first paragraph: ![descriptive alt text](PLACEHOLDER_IMAGE)  
+   - ONE supporting image after the first paragraph: ![descriptive alt text](PLACEHOLDER_IMAGE)
    - 0-1 additional images at natural break points (before major subheadings)
-   **NOTE:** The main image must be placed **after the main heading**, not before it.
-   
-18. For alt text, use SHORT, specific search terms (max 1-3 words):
-   - ALWAYS use simple English terms even for Finnish articles (better image search results)
-   - Avoid special characters, use only: letters, spaces, basic words
+   NOTE: The main image must appear after the main heading, not before it.
 
-19. In image_suggestions, provide 1-3 SHORT search terms that represent what the article is actually about. First understand the main topic of the article and the specific things it discusses, then choose images that match that topic.
+18. For every image placeholder, use SHORT, specific alt text (max 1-3 words) in English. Stick to letters and spaces only.
+
+19. Populate the structured output field `image_suggestions` with 1-3 short English search terms that match the article’s main subjects (for fallback stock-image search).
+
+20. Populate the structured output field `image_generation_briefs` with exactly two keys:
+    - `hero`: a 1-2 sentence English brief tailored for AI image generation (subjects, setting, camera angle, mood).
+    - `supporting`: a 1-2 sentence English brief for the secondary image following the same guidance.
+    Do not add extra keys or leave either entry empty.
 
 Examples:
 - ![finnish parliament](PLACEHOLDER_IMAGE)
