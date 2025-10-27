@@ -262,6 +262,7 @@ class ArticleGeneratorAgent(BaseAgent):
                     original_article_type=original_article.article_type,
                     contacts=original_article.contacts,
                     image_suggestions=llm_output.image_suggestions,
+                    image_generation_briefs=llm_output.image_generation_briefs, # new, added 27.10.2025 to generate images with AI
                 )
 
                 enriched_articles.append(enriched_article)

@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from agents.base_agent import BaseAgent
 from schemas.agent_state import AgentState
-from schemas.enriched_article import EnrichedArticle
+from schemas.enriched_article import EnrichedArticle, ImageBriefKey
 
 try:
     from runware import Runware, IImageInference
@@ -26,7 +26,6 @@ except ImportError:
 
 class ArticleImageGeneratorAgent(BaseAgent):
     """An agent that generates and adds relevant images to enriched articles.
-    
     Uses AI image generation (Runware) as primary method and Pixabay API as fallback.
     """
 
@@ -38,40 +37,40 @@ class ArticleImageGeneratorAgent(BaseAgent):
         use_ai_generation: bool = True,
     ):
         super().__init__(llm=None, prompt=None, name="ArticleImageGeneratorAgent")
-        
         self.logger = logging.getLogger(__name__)
-        
         self.pixabay_api_key = pixabay_api_key
         self.runware_api_key = runware_api_key or os.getenv("RUNWARE_API_KEY")
         self.use_ai_generation = use_ai_generation and RUNWARE_AVAILABLE
-        
         self.image_storage_path = Path(image_storage_path)
         self.image_storage_path.mkdir(parents=True, exist_ok=True)
-        
         # Initialize Runware if available
         self.runware = None
         if self.use_ai_generation and self.runware_api_key:
             self.runware = Runware(api_key=self.runware_api_key)
-            print("✅ Runware AI image generation enabled")
         elif self.use_ai_generation:
-            print("⚠️  Warning: RUNWARE_API_KEY not provided, falling back to Pixabay only")
             self.use_ai_generation = False
 
-    async def _generate_ai_image(self, prompt: str, negative_prompt: Optional[str] = None) -> Optional[str]:
+        self.default_negative_prompt = (
+            "blurry, low quality, distorted, watermark, text, logo, caption"
+        )
+        
+    async def _generate_ai_image(
+        self, prompt: str, negative_prompt: Optional[str] = None
+    ) -> Optional[str]:
         """Generate an image using Runware AI - returns image URL directly"""
         if not self.runware:
             return None
-            
+
         try:
             # Connect to Runware if not connected
-            if not hasattr(self, '_runware_connected'):
+            if not hasattr(self, "_runware_connected"):
                 await self.runware.connect()
                 self._runware_connected = True
-            
+
             # Prepare image generation request
             request = IImageInference(
                 positivePrompt=prompt,
-                negativePrompt=negative_prompt or "blurry, low quality, distorted, watermark, text",
+                negativePrompt=negative_prompt or self.default_negative_prompt,
                 width=1024,  # Mobile portrait: 9:16 aspect ratio
                 height=576,  # Taller than wide for mobile
                 model="runware:100@1",  # CHEAP MODEL
@@ -83,10 +82,10 @@ class ArticleImageGeneratorAgent(BaseAgent):
                 outputQuality=85,  # Good quality without max size
                 scheduler="DPM++ 2M Karras",  # Efficient scheduler for good quality
             )
-            
+
             # Generate image
             images = await self.runware.imageInference(requestImage=request)
-            
+
             if images and len(images) > 0:
                 image_url = images[0].imageURL
                 self.logger.info(f"✅ AI generated image: {image_url}")
@@ -94,7 +93,7 @@ class ArticleImageGeneratorAgent(BaseAgent):
             else:
                 self.logger.error("❌ No images returned from AI generation")
                 return None
-                
+
         except Exception as e:
             self.logger.error(f"❌ Failed to generate AI image: {e}")
             return None
@@ -222,14 +221,12 @@ class ArticleImageGeneratorAgent(BaseAgent):
 
             # Add date and image index
             date_str = datetime.now().strftime("%Y%m%d")
-            
             # Determine file extension from URL
             extension = "jpg"
             if ".webp" in image_url.lower():
                 extension = "webp"
             elif ".png" in image_url.lower():
                 extension = "png"
-                
             filename = f"{clean_title}_{image_index}_{date_str}.{extension}"
             local_path = self.image_storage_path / filename
 
@@ -254,29 +251,37 @@ class ArticleImageGeneratorAgent(BaseAgent):
             return None
 
     async def _get_image_for_search_term_async(
-        self, search_term: str, used_images: set, article_language: str = "en"
+        self,
+        search_term: str,
+        used_images: set,
+        article_language: str = "en",
+        ai_prompt: Optional[str] = None,
+        allow_ai: bool = True,
     ) -> Optional[str]:
-        """Get image for a search term - tries AI generation first, then Pixabay fallback"""
-        
-        # Try AI generation first if enabled
-        if self.use_ai_generation and self.runware:
-            print(f"           - Trying AI generation for: '{search_term}'")
-            
-            # Enhance prompt for better results
-            enhanced_prompt = f"professional news photography, {search_term}, high quality, clear, editorial style"
-            negative_prompt = "blurry, low quality, distorted, watermark, text, logo, caption"
-            
-            ai_image_url = await self._generate_ai_image(enhanced_prompt, negative_prompt)
-            
+        """Get image for a search term - tries AI generation first (optionally), then Pixabay fallback."""
+
+        clean_term = (search_term or "breaking news").strip()
+
+        if allow_ai and self.use_ai_generation and self.runware:
+            # If we use AI, we use its prompt for state...
+
+            positive_prompt = ai_prompt or (
+                f"professional news photography, {clean_term}, high quality, clear, editorial style"
+            )
+
+            ai_image_url = await self._generate_ai_image(
+                positive_prompt,
+                self.default_negative_prompt,
+            )
+
             if ai_image_url:
                 print(f"           - ✅ Successfully generated AI image")
                 return ai_image_url
-            else:
-                print(f"           - ⚠️ AI generation failed, falling back to Pixabay")
-        
-        # Fallback to Pixabay
-        print(f"           - Using Pixabay fallback for: '{search_term}'")
-        return self._search_pixabay_image(search_term, article_language, used_images)
+
+            print(f"           - ⚠️ AI generation failed, falling back to image search")
+
+        print(f"           - Using Pixabay fallback for: '{clean_term}'")
+        return self._search_pixabay_image(clean_term, article_language, used_images)
 
     def _process_article_images(self, article: EnrichedArticle) -> EnrichedArticle:
         """Process all images in an enriched article."""
@@ -291,6 +296,19 @@ class ArticleImageGeneratorAgent(BaseAgent):
 
         print(f"     - Found {len(placeholders)} image placeholder(s)")
 
+        # Normalize structured image briefs (hero/supporting) for quick lookup
+        raw_briefs = getattr(article, "image_generation_briefs", None)
+        image_briefs: Dict[str, str] = {}
+
+        if raw_briefs:
+            hero_brief = getattr(raw_briefs, ImageBriefKey.HERO.value, None)
+            if hero_brief:
+                image_briefs[ImageBriefKey.HERO.value] = hero_brief
+
+            supporting_brief = getattr(raw_briefs, ImageBriefKey.SUPPORTING.value, None)
+            if supporting_brief:
+                image_briefs[ImageBriefKey.SUPPORTING.value] = supporting_brief
+
         # Track used images to avoid duplicates
         used_images = set()
         hero_image_url = None
@@ -304,21 +322,32 @@ class ArticleImageGeneratorAgent(BaseAgent):
         # Run async image generation
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
+
         try:
             for i, (full_match, alt_text) in enumerate(placeholders):
                 print(f"\n     - Processing placeholder {i+1}/{len(placeholders)}")
                 print(f"       Alt text: '{alt_text}'")
 
-                # Strategy: Use alt_text first, then LLM suggestions, then category fallbacks
-                search_terms = []
+                brief_key: Optional[str] = None
+                if i == 0:
+                    brief_key = ImageBriefKey.HERO.value
+                elif i == 1:
+                    brief_key = ImageBriefKey.SUPPORTING.value
 
-                # Primary: Use alt text if it's descriptive (more than 1 word or specific term)
-                if alt_text and len(alt_text.split()) >= 1:
-                    search_terms.append(alt_text)
-                    print(f"           - Using alt text as search term: '{alt_text}'")
+                structured_brief = image_briefs.get(brief_key) if brief_key else None
+                if structured_brief:
+                    print(f"       Structured brief ({brief_key}): {structured_brief}")
 
-                # Secondary: Try LLM suggestions that haven't been used yet
+                # Strategy: Use alt text first, then LLM suggestions, then category fallbacks
+                search_terms: List[str] = []
+
+                if alt_text and alt_text.strip():
+                    cleaned_alt = alt_text.strip()
+                    search_terms.append(cleaned_alt)
+                    print(
+                        f"           - Using alt text as search term: '{cleaned_alt}'"
+                    )
+
                 available_llm_suggestions = [
                     s for s in llm_suggestions if s not in used_llm_suggestions
                 ]
@@ -330,7 +359,6 @@ class ArticleImageGeneratorAgent(BaseAgent):
                         f"           - Using LLM suggestion: '{primary_llm_suggestion}'"
                     )
 
-                # Tertiary: Fallback to category-based terms
                 if not search_terms:
                     fallback_terms = self._get_fallback_search_terms(article.categories)
                     search_terms.extend(fallback_terms)
@@ -338,31 +366,50 @@ class ArticleImageGeneratorAgent(BaseAgent):
                         f"           - Using fallback terms from categories: {fallback_terms}"
                     )
 
-                # Try to get image for the first available search term
-                image_url = None
-                for term in search_terms:
-                    if term in used_llm_suggestions and term != search_terms[0]:
-                        # Already used this LLM suggestion
-                        continue
+                if not search_terms:
+                    fallback_term = article.enriched_title or "news story"
+                    search_terms.append(fallback_term)
 
-                    # Use async method to get image (AI or Pixabay)
+                image_url = None
+                attempted_ai = False
+
+                base_term_for_prompt = search_terms[0] if search_terms else "news story"
+
+                ai_prompt_value = (structured_brief or base_term_for_prompt).strip()
+
+                if self.use_ai_generation and self.runware and ai_prompt_value:
+                    attempted_ai = True
                     image_url = loop.run_until_complete(
                         self._get_image_for_search_term_async(
-                            term, used_images, article.language
+                            base_term_for_prompt,
+                            used_images,
+                            article.language,
+                            ai_prompt=ai_prompt_value,
+                            allow_ai=True,
                         )
                     )
 
-                    if image_url:
-                        print(f"           - Found image with term: '{term}'")
-                        break
+                if not image_url:
+                    for idx, term in enumerate(search_terms):
+                        if not term:
+                            continue
 
-                # Mark LLM suggestion as used if we tried it
-                if len(search_terms) > 1 and search_terms[1] in llm_suggestions:
-                    primary_llm_suggestion = search_terms[1]
-                    used_llm_suggestions.add(primary_llm_suggestion)
-                    print(
-                        f"           - Marked LLM suggestion '{primary_llm_suggestion}' as used"
-                    )
+                        allow_ai = not attempted_ai and idx == 0
+                        image_url = loop.run_until_complete(
+                            self._get_image_for_search_term_async(
+                                term,
+                                used_images,
+                                article.language,
+                                ai_prompt=None,
+                                allow_ai=allow_ai,
+                            )
+                        )
+
+                        attempted_ai = attempted_ai or allow_ai
+
+                        if image_url:
+                            print(f"           - Found image with term: '{term}'")
+                            break
 
                 if image_url:
                     # Add to used images set
@@ -395,16 +442,18 @@ class ArticleImageGeneratorAgent(BaseAgent):
                     else:
                         # Remove placeholder if download failed
                         updated_content = updated_content.replace(full_match, "")
-                        print(f"           - Removed placeholder {i+1} (download failed)")
+                        print(
+                            f"           - Removed placeholder {i+1} (download failed)"
+                        )
                 else:
                     # Remove placeholder if no image found
                     updated_content = updated_content.replace(full_match, "")
                     print(f"           - Removed placeholder {i+1} (no image found)")
         finally:
             # Cleanup async resources
-            if self.runware and hasattr(self, '_runware_connected'):
+            if self.runware and hasattr(self, "_runware_connected"):
                 # Note: Runware SDK doesn't have explicit disconnect, but we can reset the flag
-                delattr(self, '_runware_connected')
+                delattr(self, "_runware_connected")
             loop.close()
 
         print(
@@ -436,7 +485,7 @@ class ArticleImageGeneratorAgent(BaseAgent):
         """Add relevant images to enriched articles."""
 
         print("ArticleImageGeneratorAgent: Starting to generate images for articles...")
-        
+
         if self.use_ai_generation:
             print("   - Using AI image generation (Runware) with Pixabay fallback")
         else:
@@ -467,6 +516,7 @@ class ArticleImageGeneratorAgent(BaseAgent):
             except Exception as e:
                 print(f"     - Error processing article images: {e}")
                 import traceback
+
                 traceback.print_exc()
                 # Keep original article if image processing fails
                 enhanced_articles.append(article)
@@ -490,7 +540,7 @@ if __name__ == "__main__":
     # Get API keys from environment
     pixabay_key = os.getenv("PIXABAY_API_KEY")
     runware_key = os.getenv("RUNWARE_API_KEY")
-    
+
     if not pixabay_key:
         print("❌ PIXABAY_API_KEY not found in environment variables")
         exit(1)
@@ -552,7 +602,7 @@ This initiative represents Finland's commitment to technological advancement."""
     image_agent = ArticleImageGeneratorAgent(
         pixabay_api_key=pixabay_key,
         runware_api_key=runware_key,
-        use_ai_generation=True  # Enable AI generation for test
+        use_ai_generation=True,  # Enable AI generation for test
     )
 
     print("\n--- Running ArticleImageGeneratorAgent ---")

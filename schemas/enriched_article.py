@@ -1,7 +1,7 @@
 # File: schemas/enriched_article.py
 
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -28,6 +28,25 @@ class ImageBriefKey(str, Enum):
     SUPPORTING = "supporting"
 
 
+class ImageGenerationBriefs(BaseModel):
+    hero: Optional[str] = Field(
+        default=None,
+        description="1-2 sentence AI prompt describing the hero image",
+    )
+    supporting: Optional[str] = Field(
+        default=None,
+        description="1-2 sentence AI prompt describing the supporting image",
+    )
+
+    @field_validator("hero", "supporting", mode="before")
+    @classmethod
+    def _strip_empty(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
 # THIS IS WHAT WE SEND FOR LLM
 class LLMArticleOutput(BaseModel):
     """Simplified schema for LLM output only."""
@@ -52,9 +71,9 @@ class LLMArticleOutput(BaseModel):
         default_factory=list,
         description="1-3 descriptive search terms for images that would fit this article",
     )
-    image_generation_briefs: Dict[ImageBriefKey, str] = Field(
-        default_factory=dict,
-        description="Detailed AI image prompts keyed by hero/supporting",
+    image_generation_briefs: ImageGenerationBriefs = Field(
+        default_factory=ImageGenerationBriefs,
+        description="Detailed AI image prompts for hero and supporting images",
     )
 
 
@@ -136,8 +155,8 @@ class EnrichedArticle(BaseModel):
     image_suggestions: List[str] = Field(
         default_factory=list, description="LLM suggested image search terms"
     )
-    image_generation_briefs: Dict[ImageBriefKey, str] = Field(
-        default_factory=dict,
+    image_generation_briefs: Optional[ImageGenerationBriefs] = Field(
+        default=None,
         description="Structured AI image prompts passed to the image agent",
     )
 
