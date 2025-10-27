@@ -1,5 +1,6 @@
 # File: main.py
 from dotenv import load_dotenv
+from networkx import subgraph
 from agents.article_content_extractor_agent import ArticleContentExtractorAgent
 from agents.article_image_generator_agent import ArticleImageGeneratorAgent
 from agents.editor_in_chief_agent import EditorInChiefAgent
@@ -170,9 +171,8 @@ def create_editorial_subgraph():
     # Paths lead to END
     subgraph.add_edge("publish_article", END)
     subgraph.add_edge("article_rejecter", END)
-    # TODO:: NEED TO CHECK AGAIN AFTER INTERVIEWS ARE DONE... so send to article enhancer (not done...)
-    subgraph.add_edge("interview_email_executor", END)
-    subgraph.add_edge("interview_phone_executor", END)
+    subgraph.add_edge("interview_email_executor", "publish_article") 
+    subgraph.add_edge("interview_phone_executor", "publish_article")  
 
     # AFTER THIS WE RETURN TO THE MAIN GRAPH
     # AND FROM THERE WE CHECK IF THERE ARE ANY PENDING INTERVIEWS OR REVISIONS...
