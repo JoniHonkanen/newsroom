@@ -169,10 +169,10 @@ def create_editorial_subgraph():
     )
 
     # Paths lead to END
-    subgraph.add_edge("publish_article", END)
-    subgraph.add_edge("article_rejecter", END)
     subgraph.add_edge("interview_email_executor", "publish_article") 
     subgraph.add_edge("interview_phone_executor", "publish_article")  
+    subgraph.add_edge("publish_article", END)
+    subgraph.add_edge("article_rejecter", END)
 
     # AFTER THIS WE RETURN TO THE MAIN GRAPH
     # AND FROM THERE WE CHECK IF THERE ARE ANY PENDING INTERVIEWS OR REVISIONS...

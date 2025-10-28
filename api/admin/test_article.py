@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import logging
+import os
 from langchain.chat_models import init_chat_model
 
 from agents.editor_in_chief_agent import EditorInChiefAgent
@@ -73,28 +74,31 @@ async def test_article_simple(request: SimpleArticleTest):
             review_result=None,
         )
 
-        # Mock editorial service (ei tallenna tietokantaan)
-        class MockEditorialReviewService:
-            def __init__(self, db_dsn): pass
-            def save_review(self, news_article_id, review_result): return True
-
-        # Käytä EditorInChiefAgent:ia
-        DATABASE_URL = "postgresql://test:test@localhost:5432/test"  # Mock URL
+        # Käytä OIKEAA tietokantaa (hakee persoonan)
+        # Toimii sekä tuotannossa että kehityksessä
+        DATABASE_URL = f"postgresql://{os.getenv('DB_USER', 'news')}:{os.getenv('DB_PASSWORD', 'news')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'newsroom')}"
         
-        original_init = EditorInChiefAgent.__init__
-        def mock_init(self, llm, db_dsn: str):
-            from agents.base_agent import BaseAgent
-            from schemas.editor_in_chief_schema import ReviewedNewsItem
-            BaseAgent.__init__(self, llm=llm, prompt=None, name="EditorInChiefAgent")
-            self.structured_llm = self.llm.with_structured_output(ReviewedNewsItem)
-            self.db_dsn = db_dsn
-            self.active_prompt = "Test prompt"  # Mock prompt
-            self.editorial_service = MockEditorialReviewService(db_dsn)
-
-        EditorInChiefAgent.__init__ = mock_init
+        # Mock editorial service (ei tallenna reviewia tietokantaan)
+        class MockEditorialReviewService:
+            def __init__(self, db_dsn): 
+                self.db_dsn = db_dsn
+                logger.info("🎭 MockEditorialReviewService initialized (test mode)")
+            
+            def save_review(self, news_article_id, review_result): 
+                logger.info(f"🎭 TEST MODE: Skipping database save for test article (id={news_article_id})")
+                logger.info(f"   Status: {review_result.status}")
+                logger.info(f"   Decision: {getattr(review_result, 'editorial_decision', 'N/A')}")
+                return True
 
         try:
+            # Luo EditorInChiefAgent normaalisti
+            # Se hakee persoonan tietokannasta _get_active_persona_prompt() metodilla
             editor_agent = EditorInChiefAgent(llm, DATABASE_URL)
+            
+            # Vaihda VAIN editorial service mockiksi (ei tallenna tietokantaan)
+            editor_agent.editorial_service = MockEditorialReviewService(DATABASE_URL)
+            
+            # Aja arviointi
             result_state = editor_agent.run(initial_state)
 
             review = getattr(result_state, "review_result", None)
@@ -120,22 +124,32 @@ async def test_article_simple(request: SimpleArticleTest):
                     prompt_used=getattr(editor_agent, "active_prompt", None),
                     model=model_name,
                 )
+            else:
+                logger.warning("No review_result in state after editor run")
+                return TestArticleResponse(
+                    status="error",
+                    editorial_decision="unknown",
+                    featured=False,
+                    interview_needed=False,
+                    issues_count=0,
+                    reasoning="Ei tulosta",
+                    message="Arviointi epäonnistui - ei review_result",
+                )
 
-        finally:
-            EditorInChiefAgent.__init__ = original_init
-
-        return TestArticleResponse(
-            status="error",
-            editorial_decision="unknown",
-            featured=False,
-            interview_needed=False,
-            issues_count=0,
-            reasoning="Ei tulosta",
-            message="Arviointi epäonnistui",
-        )
+        except Exception as e:
+            logger.error(f"Error during editor agent run: {str(e)}", exc_info=True)
+            return TestArticleResponse(
+                status="error",
+                editorial_decision="error",
+                featured=False,
+                interview_needed=False,
+                issues_count=0,
+                reasoning=f"Virhe agentin ajossa: {str(e)}",
+                message="Tekninen virhe agentissa",
+            )
 
     except Exception as e:
-        logger.error(f"Virhe artikkeliarviossa: {str(e)}")
+        logger.error(f"Virhe artikkeliarviossa: {str(e)}", exc_info=True)
         return TestArticleResponse(
             status="error",
             editorial_decision="error",
