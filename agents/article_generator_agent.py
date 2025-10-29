@@ -226,7 +226,7 @@ class ArticleGeneratorAgent(BaseAgent):
                         and len(result.markdown.strip()) > 50
                     ):
                         new_ref = ArticleReference(
-                            title=f"Content from {result.domain}",
+                            title=result.domain,
                             url=result.url,
                         )
                         article_references.append(new_ref)
