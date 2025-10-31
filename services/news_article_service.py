@@ -177,6 +177,20 @@ class NewsArticleService:
 
         return blocks
 
+    @staticmethod
+    def _strip_leading_h1(markdown_text: str) -> str:
+        if not markdown_text:
+            return markdown_text
+
+        stripped = re.sub(
+            r"^\s*#\s+.+?(?:\r?\n|\r|\n)?",
+            "",
+            markdown_text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+        return stripped.lstrip("\n")
+
     def _convert_location_tags(
         self, location_tags: Optional[List[LocationTag]]
     ) -> Optional[Dict[str, Any]]:
@@ -271,8 +285,9 @@ class NewsArticleService:
         lead_from_content = content_parts[0].strip()
         lead = (getattr(article, "enriched_title", "") or "").strip() or lead_from_content
 
-        # Convert markdown to HTML blocks
-        body_blocks = self._convert_markdown_to_html_blocks(article.enriched_content)
+        # Convert markdown to HTML blocks without duplicating the leading H1
+        content_without_h1 = self._strip_leading_h1(article.enriched_content)
+        body_blocks = self._convert_markdown_to_html_blocks(content_without_h1)
 
         # Convert location tags and references to JSON
         location_tags_json = self._convert_location_tags(article.locations)
@@ -405,8 +420,11 @@ class NewsArticleService:
             with psycopg.connect(self.db_dsn) as conn:
                 with conn.cursor() as cur:
                     # Päivitä markdown ja body blocks
-                    body_blocks = self._convert_markdown_to_html_blocks(
+                    content_without_h1 = self._strip_leading_h1(
                         article.enriched_content
+                    )
+                    body_blocks = self._convert_markdown_to_html_blocks(
+                        content_without_h1
                     )
 
                     cur.execute(
@@ -467,8 +485,9 @@ class NewsArticleService:
                 # Fallback
                 lead = markdown_content.split("\n\n", 1)[0].strip().lstrip('#').strip()
             
-            # Convert markdown to body blocks
-            blocks = self._convert_markdown_to_html_blocks(markdown_content)
+            # Convert markdown to body blocks without the leading H1
+            markdown_without_h1 = self._strip_leading_h1(markdown_content)
+            blocks = self._convert_markdown_to_html_blocks(markdown_without_h1)
             summary_val = summary or (markdown_content[:300] + "...")
             
             # Create embedding
