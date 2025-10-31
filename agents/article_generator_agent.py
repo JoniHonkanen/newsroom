@@ -23,6 +23,7 @@ You are an expert news editor and content creator. Your task is to create an enr
 - Content: {original_content}
 - Published: {published_at}
 - Language: {language}
+  - For example, if language is "fi" = Finnish (Suomi) - Write EVERYTHING in Finnish. If language is not specified, default to Finnish (Suomi).
 
 **Plans for Enrichment:**
 - Keywords: {planned_keywords}

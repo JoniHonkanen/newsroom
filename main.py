@@ -38,6 +38,7 @@ db_dsn = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.ge
 print("DSN:", db_dsn)
 
 llm = init_chat_model("gpt-4o-mini", model_provider="openai")
+llmBetter = init_chat_model("gpt-4o", model_provider="openai")
 
 NEWS_PLANNING_PROMPT = "Plan article: {article_text} / {published_date}"
 
@@ -101,13 +102,13 @@ def create_editorial_subgraph():
     # Initialize agents using existing ones
     editor_in_chief = EditorInChiefAgent(llm=llm, db_dsn=db_dsn)
     article_fixer = ArticleFixerAgent(
-        llm=llm, db_dsn=db_dsn
+        llm=llmBetter, db_dsn=db_dsn
     )  # For interview/revision planning
     article_publisher = ArticlePublisherAgent(db_dsn=db_dsn)  # For publishing
     article_fix_validator = FixValidationAgent(llm=llm)  # For validating fixes
     article_rejecter = ArticleRejectAgent(db_dsn=db_dsn)  # For rejecting articles
     # INTERVIEWS
-    interview_planner = InterviewPlanningAgent(llm=llm, db_dsn=db_dsn)
+    interview_planner = InterviewPlanningAgent(llm=llmBetter, db_dsn=db_dsn)
     interview_email_executor = EmailInterviewExecutionAgent(db_dsn=db_dsn)
     interview_phone_executor = PhoneInterviewExecutionAgent(db_dsn=db_dsn)
 
@@ -227,7 +228,7 @@ if __name__ == "__main__":
         llm=llm,
     )
     web_search = WebSearchAgent(max_results_per_query=1)
-    article_generator = ArticleGeneratorAgent(llm=llm)
+    article_generator = ArticleGeneratorAgent(llm=llmBetter)
     article_image_generator = ArticleImageGeneratorAgent(
         pixabay_api_key=os.getenv("PIXABAY_API_KEY")
     )
