@@ -86,13 +86,13 @@ These elements are metadata, not news content.
    - 0-1 additional images at natural break points (before major subheadings)
    NOTE: The main image must appear after the main heading, not before it.
 
-18. For every image placeholder, use SHORT, specific alt text (max 1-3 words) in English. Stick to letters and spaces only.
+18. For every image placeholder, use SHORT, specific alt text (max 1-3 words). Stick to letters and spaces only.
 
-19. Populate the structured output field `image_suggestions` with 1-3 short English search terms that match the article’s main subjects (for fallback stock-image search).
+19. Populate the structured output field `image_suggestions` with 1-3 short search terms that match the article’s main subjects (for fallback stock-image search).
 
 20. Populate the structured output field `image_generation_briefs` with exactly two keys:
-    - `hero`: a 1-2 sentence English brief tailored for AI image generation (subjects, setting, camera angle, mood).
-    - `supporting`: a 1-2 sentence English brief for the secondary image following the same guidance.
+    - `hero`: a 1-2 sentence brief tailored for AI image generation (subjects, setting, camera angle, mood).
+    - `supporting`: a 1-2 sentence brief for the secondary image following the same guidance.
     Do not add extra keys or leave either entry empty.
 
 Examples:
