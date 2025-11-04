@@ -19,7 +19,8 @@ class ArticleEnrichmentIntegration:
     def __init__(self, db_dsn: str, llm_model: str = "gpt-4o-mini"):
         self.db_dsn = db_dsn
         self.llm = init_chat_model(llm_model, model_provider="openai")
-        self.enricher_agent = ArticleEnricherAgent(self.llm, db_dsn)
+        self.llmBetter = init_chat_model("gpt-4o", model_provider="openai")
+        self.enricher_agent = ArticleEnricherAgent(self.llmBetter, db_dsn)
         self.article_service = NewsArticleService(db_dsn)
 
     def enrich_article_with_interview(
