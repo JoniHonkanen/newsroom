@@ -576,11 +576,13 @@ Teppo AI Journalist
     ## TEHTÄVÄ:
     Luo {num_questions} kysymystä, jotka:
     1. Ovat keskustelevia ja luonnollisia, vaikkakin hieman syvällisempiä kuin puhelimessa
-    2. Alkavat pehmeästi, esim. "Kerrotko...", "Mitä ajattelet...", "Miten näet..."
-    3. Käsittelevät yhtä aihetta per kysymys, mutta ilman akateemista jargonia
-    4. Pyytävät mielellään konkreettisia esimerkkejä tai henkilökohtaisia kokemuksia
-    5. Kuulostavat siltä kuin journalisti kysyisi kahvipöydässä - ystävällisesti ja aidosti kiinnostuneena
-
+    2. Mene suoraan asiaan ja aloita kysymällä, miksi ja mitä?
+    3. Jatkokysymyyksissä voit kysyä esim. "Kerrotko...", "Mitä ajattelet...", "Miten näet..."
+    4. Käsittelevät yhtä aihetta per kysymys, mutta ilman akateemista jargonia
+    5. Pyytävät mielellään konkreettisia esimerkkejä tai henkilökohtaisia kokemuksia
+    6. Kuulostavat siltä kuin journalisti kysyisi kahvipöydässä - ystävällisesti ja aidosti kiinnostuneena
+    7. Voit lopuksi kysyä, onko jotain vielä mitä haluat mainita
+    
     ## OHJEET:
     - Luo yksi kysymys kutakin asiantuntemusaluetta kohden (max 3)
     - Lisää yksi yleinen, yhteenvetävä kysymys

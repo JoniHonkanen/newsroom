@@ -48,6 +48,8 @@ Your task is to create an enriched version of the article that integrates the in
 3. **Strategic placement** - Add expert perspectives that support, challenge, or expand key points
 4. **Maintain journalistic tone** - Keep the original article's style and language ({language})
 5. **Expert attribution** - Properly credit the source with title and organization
+6. **Emphasize key news first** -Start with the most newsworthy information first (inverted pyramid structure)
+7. **Highlight new or unexpected insights** - If the expert says something unusual, contradictory, or revealing, clarify it if needed and emphasize it in the article — especially when it adds essential or newsworthy value for the audience.
 
 ### CONTENT ENHANCEMENT:
 - Parse the interview content to find relevant quotes and insights
@@ -60,6 +62,8 @@ Your task is to create an enriched version of the article that integrates the in
 - **First mention**: Introduce the expert with full credentials: "{respondent_name}, {respondent_title}, {respondent_organization}"
 - Ensure expert credentials add credibility to quotes and insights
 - Format attribution consistently throughout the article
+- When using quotes: use verbatim citations only — do not alter wording, grammar, or meaning. Paraphrases must be clearly written as such, not presented as direct quotes.
+- Paraphrased statements: must remain faithful to the expert's original intent — do not invent, exaggerate, or significantly modify the content of the expert’s remarks.
 
 ### QUALITY FOCUS:
 - Enrichment over expansion - focus on quality insights, not just length
