@@ -3,6 +3,7 @@ from schemas.agent_state import AgentState
 from schemas.enriched_article import EnrichedArticle
 import psycopg
 import datetime
+import sys
 
 from services.editor_review_service import EditorialReviewService
 
@@ -17,45 +18,40 @@ class ArticleRejectAgent(BaseAgent):
 
     def run(self, state: AgentState) -> AgentState:
         """Updates the rejected article's status and saves editorial review."""
-        print("🚫 ARTICLE REJECT AGENT: Processing rejected article...")
+        print("🚫 ARTICLE REJECT AGENT: Processing rejected article...", flush=True)
 
-        # Validointi: tarkista että on article
         if not hasattr(state, "current_article") or not state.current_article:
-            print("❌ ArticleRejectAgent: No current_article to reject!")
+            print("❌ ArticleRejectAgent: No current_article to reject!", flush=True)
             return state
 
         article: EnrichedArticle = state.current_article
         if not isinstance(article, EnrichedArticle):
             print(
-                f"❌ ArticleRejectAgent: Expected EnrichedArticle, got {type(article)}"
+                f"❌ ArticleRejectAgent: Expected EnrichedArticle, got {type(article)}",
+                flush=True,
             )
             return state
 
         if not article.news_article_id:
-            print("❌ ArticleRejectAgent: Article has no news_article_id!")
+            print("❌ ArticleRejectAgent: Article has no news_article_id!", flush=True)
             return state
 
-        # Guard against missing titles
         enriched_title = getattr(article, "enriched_title", None)
         original_title = getattr(article, "original_title", None)
         title_preview = str(enriched_title or original_title or "Unknown title")[:50]
-        
+
         rejection_reason = self._get_rejection_reason(state)
-        
-        print(f"📰 Rejecting article: {title_preview}...")
-        print(f"🔢 News Article ID: {article.news_article_id}")
-        print(f"   💬 Reason: {rejection_reason}")
+
+        print(f"📰 Rejecting article: {title_preview}...", flush=True)
+        print(f"🔢 News Article ID: {article.news_article_id}", flush=True)
+        print(f"   💬 Reason: {rejection_reason}", flush=True)
 
         try:
             with psycopg.connect(self.db_dsn) as conn:
-                # Käytä autocommit=False varmistamaan että transaktio toimii oikein
                 conn.autocommit = False
-                
                 try:
-                    # Get current timestamp
                     rejected_at = datetime.datetime.now(datetime.timezone.utc)
 
-                    # 1. Update news_article status to rejected (RETURNING lisätty)
                     cursor = conn.execute(
                         """
                         UPDATE news_article
@@ -67,22 +63,22 @@ class ArticleRejectAgent(BaseAgent):
                         """,
                         (rejected_at, article.news_article_id),
                     )
-                    
                     updated_row = cursor.fetchone()
-                    
                     if not updated_row:
                         print(
-                            f"⚠️  No rows updated - article {article.news_article_id} not found in database!"
+                            f"⚠️  No rows updated - article {article.news_article_id} not found!",
+                            flush=True,
                         )
                         conn.rollback()
                         return state
 
-                    # Varmista että status todella päivittyi
                     updated_id, updated_status = updated_row
-                    print(f"✅ Article status updated to '{updated_status}' successfully!")
-                    print(f"   🆔 Updated article ID: {updated_id}")
+                    print(
+                        f"✅ Article status updated to '{updated_status}' successfully!",
+                        flush=True,
+                    )
+                    print(f"   🆔 Updated article ID: {updated_id}", flush=True)
 
-                    # 2. Save editorial review (rejection audit trail)
                     if hasattr(state, "review_result") and state.review_result:
                         try:
                             editorial_review_id = (
@@ -92,52 +88,46 @@ class ArticleRejectAgent(BaseAgent):
                                 )
                             )
                             print(
-                                f"💾 Rejection review saved to editorial_reviews (ID: {editorial_review_id})"
+                                f"💾 Rejection review saved (ID: {editorial_review_id})",
+                                flush=True,
                             )
                         except Exception as review_error:
-                            print(f"⚠️ Failed to save editorial review: {review_error}")
-                            import traceback
-                            traceback.print_exc()
-                    else:
-                        print(
-                            "⚠️ No review_result found - skipping editorial review save"
-                        )
+                            print(
+                                f"⚠️ Failed to save editorial review: {review_error}",
+                                flush=True,
+                            )
 
                     conn.commit()
-                    print(f"✅ Database transaction committed successfully!")
-                    print(f"   📅 Rejected at: {rejected_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
-                    
-                    # LISÄ-VARMISTUS: Tarkista että status todella päivittyi tietokantaan
-                    verify_cursor = conn.execute(
-                        "SELECT status FROM news_article WHERE id = %s",
-                        (article.news_article_id,)
+                    print(f"✅ Transaction committed successfully!", flush=True)
+                    print(
+                        f"   📅 Rejected at: {rejected_at.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+                        flush=True,
                     )
-                    verify_result = verify_cursor.fetchone()
-                    
-                    if verify_result:
-                        print(f"🔍 Verification: Database status is now '{verify_result[0]}'")
-                        if verify_result[0] != 'rejected':
-                            print(f"⚠️⚠️⚠️ WARNING: Status mismatch! Expected 'rejected', got '{verify_result[0]}'")
-                    else:
-                        print(f"⚠️ Could not verify database status!")
-                
+
                 except Exception as tx_error:
-                    # Rollback jos jotain menee pieleen
                     conn.rollback()
-                    print(f"❌ Transaction failed, rolled back: {tx_error}")
+                    print(f"❌ Transaction failed, rolled back: {tx_error}", flush=True)
                     import traceback
+
                     traceback.print_exc()
-                    raise
+                    return state
 
         except psycopg.Error as db_error:
-            print(f"❌ Database error in ArticleRejectAgent: {db_error}")
+            print(f"❌ Database error in ArticleRejectAgent: {db_error}", flush=True)
             import traceback
-            traceback.print_exc()
-        except Exception as e:
-            print(f"❌ Unexpected error rejecting article: {e}")
-            import traceback
-            traceback.print_exc()
 
+            traceback.print_exc()
+            return state
+
+        except Exception as e:
+            print(f"❌ Unexpected error rejecting article: {e}", flush=True)
+            import traceback
+
+            traceback.print_exc()
+            return state
+
+        print(f"🔄 ArticleRejectAgent completed, returning state...", flush=True)
+        sys.stdout.flush()
         return state
 
     def _get_rejection_reason(self, state: AgentState) -> str:
