@@ -209,10 +209,20 @@ class FixValidationAgent(BaseAgent):
 
                 if validation_result.all_fixes_verified:
                     print("✅ SUCCESS: All required fixes have been verified.")
+                    # Eli jos oli aiemmin päätetty haastattelusta... niin haastatellaan jos artikkeli muuten kunnossa
+                    if (
+                        previous_review.interview_decision
+                        and previous_review.interview_decision.interview_needed
+                    ):
+                        final_decision = "interview"
+                        print("🎤 Fixes verified, but interview still needed")
+                    else:
+                        final_decision = "publish"
+                        print("✅ Fixes verified, ready to publish")
 
                     success_review = ReviewedNewsItem(
                         status="OK",
-                        editorial_decision="publish",
+                        editorial_decision=final_decision,
                         issues=[],
                         editorial_reasoning=EditorialReasoning(
                             reviewer="FixValidationAgent",

@@ -154,6 +154,7 @@ def create_editorial_subgraph():
         path=lambda state: state.review_result.editorial_decision,
         path_map={
             "publish": "publish_article",
+            "interview": "interview_planning", # added this 5.11.2025
             "revise": "article_fixer",  # If still needs revision, go back
             "reject": "article_rejecter",  # If rejected, we end the process
         },
