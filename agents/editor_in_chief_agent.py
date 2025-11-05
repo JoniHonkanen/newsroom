@@ -525,6 +525,28 @@ class EditorInChiefAgent(BaseAgent):
                         " (Changed from phone to email due to time restrictions)"
                     )
 
+            # Jos haastattelu tarvitaan, aseta editorial_decision = "interview"
+            # Muuten aseta status:n mukaan
+            if review_result.status == "OK":
+                if (
+                    review_result.interview_decision
+                    and review_result.interview_decision.interview_needed
+                ):
+                    review_result.editorial_decision = "interview"
+                    print(f"🎤 Editorial Decision: INTERVIEW (interview_needed=True)")
+                else:
+                    review_result.editorial_decision = "publish"
+                    print(f"✅ Editorial Decision: PUBLISH (no interview needed)")
+            elif review_result.status == "ISSUES_FOUND":
+                # Useimmat ongelmat voidaan korjata → revise
+                review_result.editorial_decision = "revise"
+                print(
+                    f"🔧 Editorial Decision: REVISE ({len(review_result.issues)} issues found)"
+                )
+            else:  # RECONSIDERATION
+                review_result.editorial_decision = "revise"
+                print(f"🤔 Editorial Decision: REVISE (reconsideration)")
+
             # Store in state for next agent
             state.review_result = review_result
 
