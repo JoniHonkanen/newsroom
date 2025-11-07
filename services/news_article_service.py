@@ -42,7 +42,7 @@ class NewsArticleService:
                 conn.commit()
 
     def _convert_markdown_to_html_blocks(
-        self, markdown_text: str
+        self, markdown_text: str, *, drop_h1: bool = False
     ) -> List[Dict[str, Any]]:
         """
         Convert markdown text to a list of HTML content blocks.
@@ -163,7 +163,17 @@ class NewsArticleService:
 
         # Create the ordered list of blocks
         blocks = []
-        for i, (_, _, block_data) in enumerate(all_matches, 1):
+        order = 1
+        seen_h1: set[str] = set()
+        for _, _, block_data in all_matches:
+            # Handle H1 logic: optionally drop OR deduplicate
+            if block_data.get("type") == "h1":
+                text_key = block_data.get("content", "").strip()
+                if drop_h1:
+                    continue  # Skip all H1 blocks entirely
+                if text_key in seen_h1:
+                    continue  # Skip duplicate identical H1s
+                seen_h1.add(text_key)
             # Skip empty quote blocks
             if block_data["type"] == "quote" and not block_data["content"].strip():
                 continue
@@ -172,24 +182,12 @@ class NewsArticleService:
             if block_data["type"] == "text" and not block_data["content"].strip():
                 continue
 
-            block_data["order"] = i
+            block_data["order"] = order
             blocks.append(block_data)
+            order += 1
 
         return blocks
 
-    @staticmethod
-    def _strip_leading_h1(markdown_text: str) -> str:
-        if not markdown_text:
-            return markdown_text
-
-        stripped = re.sub(
-            r"^\s*#\s+.+?(?:\r?\n|\r|\n)?",
-            "",
-            markdown_text,
-            count=1,
-            flags=re.MULTILINE,
-        )
-        return stripped.lstrip("\n")
 
     def _convert_location_tags(
         self, location_tags: Optional[List[LocationTag]]
@@ -285,9 +283,10 @@ class NewsArticleService:
         lead_from_content = content_parts[0].strip()
         lead = (getattr(article, "enriched_title", "") or "").strip() or lead_from_content
 
-        # Convert markdown to HTML blocks without duplicating the leading H1
-        content_without_h1 = self._strip_leading_h1(article.enriched_content)
-        body_blocks = self._convert_markdown_to_html_blocks(content_without_h1)
+        # Convert markdown to HTML blocks while dropping H1 blocks from body
+        body_blocks = self._convert_markdown_to_html_blocks(
+            article.enriched_content, drop_h1=True
+        )
 
         # Convert location tags and references to JSON
         location_tags_json = self._convert_location_tags(article.locations)
@@ -419,12 +418,9 @@ class NewsArticleService:
         try:
             with psycopg.connect(self.db_dsn) as conn:
                 with conn.cursor() as cur:
-                    # Päivitä markdown ja body blocks
-                    content_without_h1 = self._strip_leading_h1(
-                        article.enriched_content
-                    )
+                    # Päivitä markdown ja body blocks – jätetään kaikki H1:t pois bodysta
                     body_blocks = self._convert_markdown_to_html_blocks(
-                        content_without_h1
+                        article.enriched_content, drop_h1=True
                     )
 
                     cur.execute(
@@ -477,17 +473,18 @@ class NewsArticleService:
             import datetime
             import re
             
-            # Pura otsikko H1:stä
-            title_match = re.match(r'^#\s+(.+?)$', markdown_content, re.MULTILINE)
+            # Pura otsikko H1:stä (salli johtavat tyhjät rivit ja H1 missä tahansa rivillä)
+            title_match = re.search(r'^\s*#\s+(.+?)\s*$', markdown_content, re.MULTILINE)
             if title_match:
                 lead = title_match.group(1).strip()
             else:
                 # Fallback
                 lead = markdown_content.split("\n\n", 1)[0].strip().lstrip('#').strip()
             
-            # Convert markdown to body blocks without the leading H1
-            markdown_without_h1 = self._strip_leading_h1(markdown_content)
-            blocks = self._convert_markdown_to_html_blocks(markdown_without_h1)
+            # Convert markdown to body blocks while dropping all H1 blocks from body
+            blocks = self._convert_markdown_to_html_blocks(
+                markdown_content, drop_h1=True
+            )
             summary_val = summary or (markdown_content[:300] + "...")
             
             # Create embedding
