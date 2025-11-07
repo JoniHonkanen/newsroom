@@ -79,8 +79,20 @@ class ArticleRejectAgent(BaseAgent):
                     )
                     print(f"   🆔 Updated article ID: {updated_id}", flush=True)
 
+                    # IMPORTANT: Commit the article rejection BEFORE saving editorial review
+                    # to avoid cross-connection lock waits if the review saving touches
+                    # related tables (or even news_article in some cases).
+                    conn.commit()
+                    print(f"✅ Transaction committed successfully!", flush=True)
+                    print(
+                        f"   📅 Rejected at: {rejected_at.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+                        flush=True,
+                    )
+
+                    # Now save the rejection review in a separate connection safely
                     if hasattr(state, "review_result") and state.review_result:
                         try:
+                            print("📝 Saving rejection editorial review...", flush=True)
                             editorial_review_id = (
                                 self.editorial_service.save_editorial_review(
                                     news_article_id=article.news_article_id,
@@ -96,13 +108,6 @@ class ArticleRejectAgent(BaseAgent):
                                 f"⚠️ Failed to save editorial review: {review_error}",
                                 flush=True,
                             )
-
-                    conn.commit()
-                    print(f"✅ Transaction committed successfully!", flush=True)
-                    print(
-                        f"   📅 Rejected at: {rejected_at.strftime('%Y-%m-%d %H:%M:%S UTC')}",
-                        flush=True,
-                    )
 
                 except Exception as tx_error:
                     conn.rollback()
