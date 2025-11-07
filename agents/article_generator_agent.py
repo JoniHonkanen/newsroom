@@ -53,6 +53,7 @@ These elements are metadata, not news content.
     - Is specific and factual, not vague or clickbait
     - Uses active voice and strong verbs when possible
     - Is compelling enough to encourage reading
+    - Capitalizes only the first word and proper nouns — do not capitalize every word
 7. Use the web search results to add depth, context, background information, and new perspectives to the story.
 8. If you use web search sources, you can mention them in the text to indicate where information came from, and always cite the source when using a direct quotation from any material.
 9. Structure the article with appropriate headings, paragraphs, and a logical flow.

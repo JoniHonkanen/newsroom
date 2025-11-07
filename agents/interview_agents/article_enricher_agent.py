@@ -41,6 +41,7 @@ Your task is to create an enriched version of the article that integrates the in
 - Keep the original title's core message and structure intact
 - Avoid adding expert names or interview references to the title
 - Only make minimal adjustments if absolutely necessary for clarity
+- Capitalize only the first word and proper nouns — do not capitalize every word
 
 ### INTEGRATION STRATEGY:
 1. **Preserve original structure** - Enhance existing content, don't completely rewrite
