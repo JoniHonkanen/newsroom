@@ -222,7 +222,7 @@ def process_editorial_batch(state: AgentState):
 
 if __name__ == "__main__":
     # START THE WHOLE AGENT THINGS BY COMMAND: python main.py
-    feed_reader = FeedReaderAgent(feed_urls=[f.url for f in feeds], max_news=1)
+    feed_reader = FeedReaderAgent(feed_urls=[f.url for f in feeds], max_news=3)
     article_extractor = ArticleContentExtractorAgent()
     news_storer = NewsStorerAgent(db_dsn=db_dsn)
     news_planner = NewsPlannerAgent(
