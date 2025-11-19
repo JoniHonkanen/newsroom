@@ -133,13 +133,19 @@ def create_editorial_subgraph():
     subgraph.add_edge(START, "editor_in_chief")
 
     # Conditional edges based on editorial decision
-    # DO WE NEED TO PUBLISH, INTERVIEW, REVISE OR REJECT?
+    # INTERVIEW FLOW TEMPORARILY DISABLED:
+    # We route any 'interview' decision directly to 'publish_article'.
+    # To re-enable interviews:
+    #   1) Change the mapping below so "interview": "interview_planning"
+    #   2) Ensure subsequent mapping (article_fix_validator) also sends 'interview' to 'interview_planning'
+    #   3) Keep interview_email_executor / interview_phone_executor nodes intact.
+    # This keeps code paths present but unused.
     subgraph.add_conditional_edges(
         source="editor_in_chief",
         path=get_editorial_decision,
         path_map={
             "publish": "publish_article",
-            "interview": "interview_planning",
+            "interview": "publish_article",  # <-- change back to "interview_planning" to enable interviews
             "revise": "article_fixer",
             "reject": "article_rejecter",
         },
@@ -154,7 +160,8 @@ def create_editorial_subgraph():
         path=lambda state: state.review_result.editorial_decision,
         path_map={
             "publish": "publish_article",
-            "interview": "interview_planning", # added this 5.11.2025
+            # INTERVIEW DISABLED HERE AS WELL – revert to "interview_planning" to restore
+            "interview": "publish_article",
             "revise": "article_fixer",  # If still needs revision, go back
             "reject": "article_rejecter",  # If rejected, we end the process
         },
