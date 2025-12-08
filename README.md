@@ -1,6 +1,17 @@
 # Newsroom AI Pipeline
 
+**Part of the Newsroom ecosystem:** This backend handles automated news generation, enrichment, and editorial review. The system consists of multiple agents that process RSS feeds, create news content, conduct interviews, and publish approved articles.
+
+**Related projects:**
+- [Frontend (newsroom_production_frontend)](https://github.com/JoniHonkanen/newsroom_production_frontend) - Public news site that displays published articles
+- [Prompt Manager (newsroom_prompt_manager)](https://github.com/JoniHonkanen/newsroom_prompt_manager) - Admin interface for managing prompts and testing (prompts and phone calls)
+
+**Technologies:** Python, FastAPI, LangGraph, PostgreSQL (pgvector), Strawberry GraphQL
+
+## Overview
+
 An automated, multi-agent newsroom pipeline that:
+
 - Fetches and deduplicates fresh articles from configured RSS feeds.
 - Plans news coverage and runs targeted web searches to enrich context.
 - Generates enriched articles (text + images) using LLM + image APIs.
@@ -132,7 +143,7 @@ Copy `.env_example` to `.env` and fill values:
 - Image APIs: `RUNWARE_API_KEY`, `PIXABAY_API_KEY`
 - Static path: `STATIC_FILE_PATH` (host path for storing images)
 - Servers: `BUSINESS_LOGIC_SERVER`, `GRAPHQL_SERVER`
-- Optional local tunnel for Twilio webhooks: `LOCALTUNNEL_URL`
+- Optional local tunnel for Twilio webhooks: `LOCALTUNNEL_URL` (THIS IS ONLY FOR LOCAL TESTING)
 
 Ensure the Postgres vars match the compose configuration (for local: DB_HOST=localhost when running agents outside container; inside compose DB_HOST=db).
 
@@ -257,11 +268,6 @@ docker compose logs -f agents  # Watch pipeline run
 - Restrict Twilio webhooks behind a tunnel / firewall during local dev.
 - Consider adding rate limits / auth to admin endpoints before production usage.
 
-## License & Usage
-(Add your project license details here if needed.)
-
----
-If something is unclear or you need a deeper dive into a specific agent, open an issue or extend this README section. Happy building! 🚀
 
 ## Frontend Clients
 
@@ -290,7 +296,7 @@ This backend + agents stack is intended to be used with two separate frontends:
 
 ### Reverse Proxy (Nginx Proxy Manager)
 
-The `npm` service can be used to expose the services under your own domains with TLS:
+The `npm` service provides a web-based reverse proxy with automatic SSL certificate management.
 
 - Map domain → service:
    - `newsroom-api.example.com` → `backend:8000`
@@ -298,11 +304,50 @@ The `npm` service can be used to expose the services under your own domains with
    - Optionally serve static from GraphQL: `https://newsroom-graphql.example.com/static/...`
 - Obtain certificates via the Nginx Proxy Manager UI on port `81`.
 
-### Quick URL Reference (local)
+#### Configure Proxy Hosts
 
-- Backend (FastAPI): `http://localhost:8000` (docs at `/docs`, health at `/health`)
-- GraphQL (Strawberry): `http://localhost:4000/graphql`
-- Static assets (images): `http://localhost:4000/static`
+![Nginx Proxy Manager Configuration](plans/newsroom_proxy_manager.png)
+
+**For Backend API (api.gptnewsroom.fi):**
+
+**Details Tab:**
+- Domain Names: `api.gptnewsroom.fi`
+- Scheme: `http`
+- Forward Hostname/IP: `backend`
+- Forward Port: `8000`
+- Cache Assets: Off (recommended for API)
+- Block Common Exploits: On
+- Websockets Support: On
+- Access List: Publicly Accessible
+
+**Custom Locations Tab:**
+
+Add two custom locations:
+
+1. **GraphQL Endpoint:**
+   - Location: `/graphql`
+   - Scheme: `http`
+   - Forward Hostname/IP: `graphql`
+   - Forward Port: `4000`
+
+2. **Static Assets (Images):**
+   - Location: `/static`
+   - Scheme: `http`
+   - Forward Hostname/IP: `backend`
+   - Forward Port: `8000`
+
+**SSL Tab:**
+- SSL Certificate: Request new Let's Encrypt certificate
+- Force SSL: On
+- HTTP/2 Support: On
+- HSTS Enabled: Optional (recommended for production)
+
+#### How it works
+
+With this configuration:
+- `https://api.gptnewsroom.fi/graphql` → GraphQL service (port 4000)
+- `https://api.gptnewsroom.fi/static/image.jpg` → Backend static files (port 8000)
+- `https://api.gptnewsroom.fi/api/*` → Backend API endpoints (port 8000)
 
 ## Architecture Diagrams (Images)
 
