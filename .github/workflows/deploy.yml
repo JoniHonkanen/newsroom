@@ -9,7 +9,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+    if: github.repository == 'JoniHonkanen/newsroom'
     steps:
     - name: Deploy to Server
       uses: appleboy/ssh-action@v1.0.0
